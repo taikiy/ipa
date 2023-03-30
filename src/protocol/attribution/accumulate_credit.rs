@@ -1,3 +1,5 @@
+use futures::future::try_join_all;
+
 use super::{
     do_the_binary_tree_thing,
     input::{MCAccumulateCreditInputRow, MCAccumulateCreditOutputRow},
@@ -5,7 +7,7 @@ use super::{
 use crate::{
     error::Error,
     ff::Field,
-    protocol::{context::Context, BasicProtocols},
+    protocol::{context::Context, BasicProtocols, RecordId},
     secret_sharing::Linear as LinearSecretSharing,
 };
 
@@ -15,29 +17,54 @@ use crate::{
 /// So in the event that a `source report` is followed by multiple `trigger reports`, only one will count.
 /// As such, this function can be simplified a great deal. All that matters is when a `source report` is
 /// immediately followed by a `trigger report` from the same `match key`. As such, each row only needs to
-/// be compared to the following row.
+/// be compared to the following row. This is done by multiplying the `is_trigger_report` by the `helper_bit`,
+/// which is what `stop_bits` is.
 /// If there are multiple attributed conversions from the same `match key` they will be removed in the
 /// next stage; `user capping`.
 ///
 /// This method implements "last touch" attribution, so only the last `source report` before a `trigger report`
 /// will receive any credit.
-#[allow(clippy::unused_async)] // TODO: Remove this line in the next PR
 async fn accumulate_credit_cap_one<'a, F, C, T>(
-    _ctx: C, // TODO: Remove the "_" prefix. We still need the context to be passed in for the next PR
+    ctx: C,
     input: &'a [MCAccumulateCreditInputRow<F, T>],
     stop_bits: &'a [T],
+    attribution_window_seconds: u32,
 ) -> Result<impl Iterator<Item = MCAccumulateCreditOutputRow<F, T>> + 'a, Error>
 where
     F: Field,
     C: Context,
     T: LinearSecretSharing<F> + BasicProtocols<C, F>,
 {
-    let output = input.iter().zip(stop_bits).map(|(x, credit)| {
+    // if `attribution_window_seconds` is 0, we use `stop_bits` directly. Otherwise, we need to invalidate
+    // credits that are outside the attribution window by multiplying them by `active_bit`. active_bit is
+    // 0 if the trigger report's time-delta to the nearest source report is greater than the attribution window.
+    let credits = if attribution_window_seconds == 0 {
+        stop_bits.to_vec()
+    } else {
+        let memoize_context = ctx
+            .narrow(&Step::ActiveBitTimesStopBit)
+            .set_total_records(input.len() - 1);
+        try_join_all(
+            input
+                .iter()
+                .skip(1)
+                .zip(stop_bits)
+                .enumerate()
+                .map(|(i, (x, sb))| {
+                    let c = memoize_context.clone();
+                    let record_id = RecordId::from(i);
+                    async move { x.active_bit.multiply(sb, c, record_id).await }
+                }),
+        )
+        .await?
+    };
+
+    let output = input.iter().zip(credits).map(|(x, credit)| {
         MCAccumulateCreditOutputRow::new(
             x.is_trigger_report.clone(),
             x.helper_bit.clone(),
             x.breakdown_key.clone(),
-            credit.clone(),
+            credit,
         )
     });
 
@@ -60,6 +87,7 @@ pub async fn accumulate_credit<F, C, T>(
     input: &[MCAccumulateCreditInputRow<F, T>],
     stop_bits: &[T],
     per_user_credit_cap: u32,
+    attribution_window_seconds: u32,
 ) -> Result<Vec<MCAccumulateCreditOutputRow<F, T>>, Error>
 where
     F: Field,
@@ -67,9 +95,11 @@ where
     T: LinearSecretSharing<F> + BasicProtocols<C, F>,
 {
     if per_user_credit_cap == 1 {
-        return Ok(accumulate_credit_cap_one(ctx, input, stop_bits)
-            .await?
-            .collect::<Vec<_>>());
+        return Ok(
+            accumulate_credit_cap_one(ctx, input, stop_bits, attribution_window_seconds)
+                .await?
+                .collect::<Vec<_>>(),
+        );
     }
 
     let mut credits = input
@@ -110,6 +140,21 @@ where
     Ok(output)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Step {
+    ActiveBitTimesStopBit,
+}
+
+impl crate::protocol::Substep for Step {}
+
+impl AsRef<str> for Step {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::ActiveBitTimesStopBit => "active_bit_times_stop_bit",
+        }
+    }
+}
+
 #[cfg(all(test, not(feature = "shuttle")))]
 mod tests {
     use std::iter;
@@ -140,31 +185,34 @@ mod tests {
 
     #[tokio::test]
     pub async fn accumulate() {
-        const EXPECTED: &[u128; 19] = &[
-            0, 0, 19, 19, 9, 7, 6, 1, 0, 10, 15, 15, 12, 0, 10, 10, 4, 6, 6,
+        const EXPECTED: &[u128; 21] = &[
+            0, 0, 19, 19, 9, 7, 6, 1, 0, 0, 0, 10, 15, 15, 12, 0, 10, 10, 4, 6, 6,
         ];
+        const ATTRIBUTION_WINDOW_SECONDS: u32 = 0;
 
         let input: Vec<GenericReportTestInput<Fp32BitPrime, MatchKey, BreakdownKey>> = accumulation_test_input!(
             [
-                { is_trigger_report: 0, helper_bit: 0, breakdown_key: 3, credit: 0 },
-                { is_trigger_report: 0, helper_bit: 0, breakdown_key: 4, credit: 0 },
-                { is_trigger_report: 0, helper_bit: 1, breakdown_key: 4, credit: 0 },
-                { is_trigger_report: 1, helper_bit: 1, breakdown_key: 0, credit: 10 },
-                { is_trigger_report: 1, helper_bit: 1, breakdown_key: 0, credit: 2 },
-                { is_trigger_report: 1, helper_bit: 1, breakdown_key: 0, credit: 1 },
-                { is_trigger_report: 1, helper_bit: 1, breakdown_key: 0, credit: 5 },
-                { is_trigger_report: 1, helper_bit: 1, breakdown_key: 0, credit: 1 },
-                { is_trigger_report: 0, helper_bit: 0, breakdown_key: 1, credit: 0 },
-                { is_trigger_report: 1, helper_bit: 0, breakdown_key: 0, credit: 10 },
-                { is_trigger_report: 0, helper_bit: 0, breakdown_key: 2, credit: 0 },
-                { is_trigger_report: 1, helper_bit: 1, breakdown_key: 0, credit: 3 },
-                { is_trigger_report: 1, helper_bit: 1, breakdown_key: 0, credit: 12 },
-                { is_trigger_report: 0, helper_bit: 1, breakdown_key: 2, credit: 0 },
-                { is_trigger_report: 0, helper_bit: 1, breakdown_key: 2, credit: 0 },
-                { is_trigger_report: 1, helper_bit: 1, breakdown_key: 0, credit: 6 },
-                { is_trigger_report: 1, helper_bit: 1, breakdown_key: 0, credit: 4 },
-                { is_trigger_report: 0, helper_bit: 1, breakdown_key: 5, credit: 0 },
-                { is_trigger_report: 1, helper_bit: 1, breakdown_key: 5, credit: 6 },
+                { is_trigger_report: 0, helper_bit: 0, active_bit: 0, breakdown_key: 3, credit: 0 },
+                { is_trigger_report: 0, helper_bit: 0, active_bit: 0, breakdown_key: 4, credit: 0 },
+                { is_trigger_report: 0, helper_bit: 1, active_bit: 0, breakdown_key: 4, credit: 0 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 0, breakdown_key: 0, credit: 10 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 0, breakdown_key: 0, credit: 2 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 0, breakdown_key: 0, credit: 1 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 0, breakdown_key: 0, credit: 5 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 0, breakdown_key: 0, credit: 1 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 1, breakdown_key: 0, credit: 0 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 1, breakdown_key: 0, credit: 0 },
+                { is_trigger_report: 0, helper_bit: 0, active_bit: 0, breakdown_key: 1, credit: 0 },
+                { is_trigger_report: 1, helper_bit: 0, active_bit: 0, breakdown_key: 0, credit: 10 },
+                { is_trigger_report: 0, helper_bit: 0, active_bit: 0, breakdown_key: 2, credit: 0 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 0, breakdown_key: 0, credit: 3 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 0, breakdown_key: 0, credit: 12 },
+                { is_trigger_report: 0, helper_bit: 1, active_bit: 0, breakdown_key: 2, credit: 0 },
+                { is_trigger_report: 0, helper_bit: 1, active_bit: 0, breakdown_key: 2, credit: 0 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 0, breakdown_key: 0, credit: 6 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 0, breakdown_key: 0, credit: 4 },
+                { is_trigger_report: 0, helper_bit: 1, active_bit: 0, breakdown_key: 5, credit: 0 },
+                { is_trigger_report: 1, helper_bit: 1, active_bit: 0, breakdown_key: 5, credit: 6 },
             ];
             (Fp32BitPrime, MatchKey, BreakdownKey)
         );
@@ -195,6 +243,7 @@ mod tests {
                         .map(|(row, bk)| MCAccumulateCreditInputRow::new(
                              row.is_trigger_report.clone(),
                              row.helper_bit.clone(),
+                             row.active_bit.clone(),
                              bk,
                              row.trigger_value.clone(),
                         ))
@@ -203,7 +252,7 @@ mod tests {
                     let (itb, hb): (Vec<_>, Vec<_>) = input.iter().map(|x| (x.is_trigger_report.clone(), x.helper_bit.clone())).unzip();
                     let stop_bits = compute_stop_bits(ctx.clone(), &itb, &hb).await.unwrap().collect::<Vec<_>>();
 
-                    accumulate_credit(ctx, &modulus_converted_shares, &stop_bits, 12345) // cap can be anything but one
+                    accumulate_credit(ctx, &modulus_converted_shares, &stop_bits, 12345, ATTRIBUTION_WINDOW_SECONDS) // cap can be anything but one
                         .await
                         .unwrap()
                 },
@@ -233,6 +282,7 @@ mod tests {
             {
                 is_trigger_report: rng.gen::<u8>(),
                 helper_bit: rng.gen::<u8>(),
+                active_bit: rng.gen::<u8>(),
                 breakdown_key: rng.gen::<u8>(),
                 credit: rng.gen::<u8>(),
             };
@@ -259,6 +309,7 @@ mod tests {
                         let modulus_converted_share = MCAccumulateCreditInputRow::new(
                             share.is_trigger_report,
                             share.helper_bit,
+                            share.active_bit,
                             converted_bk_shares.into_iter().next().unwrap(),
                             share.trigger_value,
                         );

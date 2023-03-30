@@ -883,6 +883,95 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn cap_of_one_with_attribution_window() {
+        const PER_USER_CAP: u32 = 1;
+        const EXPECTED: &[[u128; 2]] = &[[0, 0], [1, 1], [2, 0], [3, 1], [4, 0], [5, 0], [6, 1]];
+        const MAX_BREAKDOWN_KEY: u32 = 7;
+        const ATTRIBUTION_WINDOW_SECONDS: u32 = 3;
+        const NUM_MULTI_BITS: u32 = 3;
+
+        let world = TestWorld::default();
+
+        let records: Vec<GenericReportTestInput<Fp31, MatchKey, BreakdownKey>> = ipa_test_input!(
+            [
+                { timestamp: 0, match_key: 12345, is_trigger_report: 0, breakdown_key: 0, trigger_value: 0 }, // Irrelevant
+                { timestamp: 1, match_key: 12345, is_trigger_report: 0, breakdown_key: 1, trigger_value: 0 }, // A
+                { timestamp: 2, match_key: 68362, is_trigger_report: 0, breakdown_key: 2, trigger_value: 0 }, // B
+                { timestamp: 3, match_key: 12345, is_trigger_report: 1, breakdown_key: 0, trigger_value: 0 }, // This will be attributed to A (3 - 1 = 2)
+                { timestamp: 4, match_key: 77777, is_trigger_report: 1, breakdown_key: 1, trigger_value: 0 }, // Irrelevant
+                { timestamp: 5, match_key: 68362, is_trigger_report: 1, breakdown_key: 0, trigger_value: 0 }, // This will be attributed to B, but will be capped (5 - 2 = 3)
+                { timestamp: 6, match_key: 12345, is_trigger_report: 1, breakdown_key: 0, trigger_value: 0 }, // Irrelevant
+                { timestamp: 7, match_key: 68362, is_trigger_report: 0, breakdown_key: 3, trigger_value: 0 }, // C
+                { timestamp: 8, match_key: 77777, is_trigger_report: 0, breakdown_key: 4, trigger_value: 0 }, // Irrelevant
+                { timestamp: 9, match_key: 68362, is_trigger_report: 1, breakdown_key: 0, trigger_value: 0 }, // This will be attributed to C, but will be capped (9 - 7 = 2)
+                { timestamp: 10, match_key: 81818, is_trigger_report: 0, breakdown_key: 6, trigger_value: 0 }, // E
+                { timestamp: 11, match_key: 68362, is_trigger_report: 1, breakdown_key: 0, trigger_value: 0 }, // Irrelevant
+                { timestamp: 12, match_key: 81818, is_trigger_report: 1, breakdown_key: 0, trigger_value: 0 }, // This will be attributed to E (12 - 10 = 2)
+                { timestamp: 13, match_key: 68362, is_trigger_report: 0, breakdown_key: 5, trigger_value: 0 }, // D
+                { timestamp: 14, match_key: 99999, is_trigger_report: 0, breakdown_key: 6, trigger_value: 0 }, // Irrelevant
+                { timestamp: 17, match_key: 68362, is_trigger_report: 1, breakdown_key: 0, trigger_value: 0 }, // This will NOT be attributed to D because it exceeds the attribution window (17 - 13 = 4)
+            ];
+            (Fp31, MatchKey, BreakdownKey)
+        );
+
+        let result: Vec<GenericReportTestInput<Fp31, MatchKey, BreakdownKey>> = world
+            .semi_honest(records.clone(), |ctx, input_rows| async move {
+                ipa::<Fp31, MatchKey, BreakdownKey>(
+                    ctx,
+                    &input_rows,
+                    PER_USER_CAP,
+                    MAX_BREAKDOWN_KEY,
+                    ATTRIBUTION_WINDOW_SECONDS,
+                    NUM_MULTI_BITS,
+                )
+                .await
+                .unwrap()
+            })
+            .await
+            .reconstruct();
+
+        assert_eq!(EXPECTED.len(), result.len());
+
+        for (i, expected) in EXPECTED.iter().enumerate() {
+            assert_eq!(
+                *expected,
+                [
+                    result[i].breakdown_key.as_u128(),
+                    result[i].trigger_value.as_u128()
+                ]
+            );
+        }
+
+        let result: Vec<GenericReportTestInput<_, MatchKey, BreakdownKey>> = world
+            .semi_honest(records, |ctx, input_rows| async move {
+                ipa_malicious::<Fp31, MatchKey, BreakdownKey>(
+                    ctx,
+                    &input_rows,
+                    PER_USER_CAP,
+                    MAX_BREAKDOWN_KEY,
+                    ATTRIBUTION_WINDOW_SECONDS,
+                    NUM_MULTI_BITS,
+                )
+                .await
+                .unwrap()
+            })
+            .await
+            .reconstruct();
+
+        assert_eq!(EXPECTED.len(), result.len());
+
+        for (i, expected) in EXPECTED.iter().enumerate() {
+            assert_eq!(
+                *expected,
+                [
+                    result[i].breakdown_key.as_u128(),
+                    result[i].trigger_value.as_u128()
+                ]
+            );
+        }
+    }
+
+    #[tokio::test]
     #[allow(clippy::missing_panics_doc)]
     pub async fn random_ipa_check() {
         const MAX_BREAKDOWN_KEY: u32 = 64;
