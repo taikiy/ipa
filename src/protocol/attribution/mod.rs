@@ -4,6 +4,7 @@ pub mod apply_attribution_window;
 pub mod credit_capping;
 pub mod input;
 pub mod malicious;
+pub mod secure_credit_capping;
 pub mod semi_honest;
 
 use crate::{
