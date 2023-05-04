@@ -6,7 +6,7 @@ use crate::{
         context::Context,
         modulus_conversion::{convert_bit, convert_bit_local, BitConversionTriple},
         prss::SharedRandomness,
-        step::BitOpStep,
+        step::{BitOpStep, Gate},
         RecordId,
     },
     secret_sharing::{
@@ -26,13 +26,14 @@ pub trait RandomBits<V: SharedValue> {
     async fn generate_random_bits(self, record_id: RecordId) -> Result<Vec<Self::Share>, Error>;
 }
 
-fn random_bits_triples<F, C>(
+fn random_bits_triples<F, C, G>(
     ctx: &C,
     record_id: RecordId,
 ) -> Vec<BitConversionTriple<Replicated<F>>>
 where
     F: PrimeField,
-    C: Context,
+    C: Context<G>,
+    G: Gate,
 {
     // Calculate the number of bits we need to form a random number that
     // has the same number of bits as the prime.
@@ -54,15 +55,16 @@ where
         .collect::<Vec<_>>()
 }
 
-async fn convert_triples_to_shares<F, C, S>(
+async fn convert_triples_to_shares<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     triples: &[BitConversionTriple<S>],
 ) -> Result<Vec<S>, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + SecureMul<C, G>,
 {
     ctx.parallel_join(triples.iter().enumerate().map(|(i, t)| {
         let c = ctx.narrow(&BitOpStep::from(i));

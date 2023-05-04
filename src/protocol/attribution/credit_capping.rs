@@ -10,6 +10,7 @@ use crate::{
         basics::{if_else, SecureMul},
         boolean::{greater_than_constant, random_bits_generator::RandomBitsGenerator, RandomBits},
         context::Context,
+        step::Gate,
         BasicProtocols, RecordId,
     },
     secret_sharing::Linear as LinearSecretSharing,
@@ -23,15 +24,16 @@ use std::iter::{repeat, zip};
 /// ## Errors
 /// Fails if the multiplication protocol fails, or if the `cap` is larger than
 /// 1/2 of the prime number.
-pub async fn credit_capping<F, C, T>(
+pub async fn credit_capping<F, C, T, G>(
     ctx: C,
     input: &[MCCreditCappingInputRow<F, T>],
     cap: u32,
 ) -> Result<Vec<MCCreditCappingOutputRow<F, T>>, Error>
 where
     F: PrimeField,
-    C: Context + RandomBits<F, Share = T>,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G> + RandomBits<F, Share = T>,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+    G: Gate,
 {
     if cap == 1 {
         return Ok(credit_capping_max_one(ctx, input)
@@ -146,14 +148,15 @@ where
 /// is from the same `match-key`, and the prefix-OR indicates that there is *at least one* attributed conversion
 /// in the following rows, then the contribution is "capped", which in this context means set to zero.
 /// In this way, only the final attributed conversion will not be "capped".
-async fn credit_capping_max_one<F, C, T>(
+async fn credit_capping_max_one<F, C, T, G>(
     ctx: C,
     input: &[MCCreditCappingInputRow<F, T>],
 ) -> Result<impl Iterator<Item = MCCreditCappingOutputRow<F, T>> + '_, Error>
 where
     F: Field,
-    C: Context,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let input_len = input.len();
 
@@ -216,14 +219,15 @@ where
     Ok(output)
 }
 
-async fn mask_source_credits<F, C, T>(
+async fn mask_source_credits<F, C, T, G>(
     input: &[MCCreditCappingInputRow<F, T>],
     ctx: C,
 ) -> Result<Vec<T>, Error>
 where
     F: Field,
-    C: Context,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+    G: Gate,
 {
     ctx.try_join(
         input
@@ -242,15 +246,16 @@ where
     .await
 }
 
-async fn report_level_capping<F, C, T>(
+async fn report_level_capping<F, C, T, G>(
     ctx: C,
     original_credits: &[T],
     cap: u32,
 ) -> Result<Vec<T>, Error>
 where
     F: PrimeField,
-    C: Context + RandomBits<F, Share = T>,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G> + RandomBits<F, Share = T>,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+    G: Gate,
 {
     let share_of_cap = T::share_known_value(&ctx, F::truncate_from(cap));
     let cap_ref = &share_of_cap;
@@ -272,15 +277,16 @@ where
     .await
 }
 
-async fn credit_prefix_sum<'a, F, C, T, I>(
+async fn credit_prefix_sum<'a, F, C, T, G, I>(
     ctx: C,
     input: &[MCCreditCappingInputRow<F, T>],
     original_credits: I,
 ) -> Result<Vec<T>, Error>
 where
     F: Field,
-    C: Context,
-    T: LinearSecretSharing<F> + SecureMul<C> + 'a,
+    C: Context<G>,
+    T: LinearSecretSharing<F> + SecureMul<C, G> + 'a,
+    G: Gate,
     I: Iterator<Item = &'a T>,
 {
     let helper_bits = input
@@ -296,15 +302,16 @@ where
     Ok(credits)
 }
 
-async fn is_credit_larger_than_cap<F, C, T>(
+async fn is_credit_larger_than_cap<F, C, T, G>(
     ctx: C,
     prefix_summed_credits: &[T],
     cap: u32,
 ) -> Result<Vec<T>, Error>
 where
     F: PrimeField,
-    C: Context + RandomBits<F, Share = T>,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G> + RandomBits<F, Share = T>,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+    G: Gate,
 {
     let ctx_ref = &ctx;
     let ctx = ctx.set_total_records(prefix_summed_credits.len());
@@ -331,15 +338,16 @@ where
         .await
 }
 
-async fn propagate_overflow_detection<F, C, T>(
+async fn propagate_overflow_detection<F, C, T, G>(
     ctx: C,
     input: &[MCCreditCappingInputRow<F, T>],
     exceeds_cap_bits: Vec<T>,
 ) -> Result<Vec<T>, Error>
 where
     F: PrimeField,
-    C: Context + RandomBits<F, Share = T>,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G> + RandomBits<F, Share = T>,
+    G: Gate,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let helper_bits = input
         .iter()
@@ -355,7 +363,7 @@ where
     .await
 }
 
-async fn compute_final_credits<F, C, T>(
+async fn compute_final_credits<F, C, T, G>(
     ctx: C,
     input: &[MCCreditCappingInputRow<F, T>],
     prefix_summed_credits: &[T],
@@ -365,8 +373,9 @@ async fn compute_final_credits<F, C, T>(
 ) -> Result<Vec<T>, Error>
 where
     F: Field,
-    C: Context,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let num_rows = input.len();
     let cap_share = T::share_known_value(&ctx, F::try_from(cap.into()).unwrap());

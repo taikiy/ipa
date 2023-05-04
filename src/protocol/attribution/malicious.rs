@@ -15,6 +15,7 @@ use crate::{
         context::{Context, SemiHonestContext},
         ipa::IPAModulusConvertedInputRow,
         malicious::MaliciousValidator,
+        step::Gate,
     },
     secret_sharing::replicated::{
         malicious::{AdditiveShare, ExtendableField},
@@ -27,16 +28,17 @@ use std::iter::{once, zip};
 ///
 /// # Errors
 /// propagates errors from multiplications
-pub async fn secure_attribution<'a, F, BK>(
-    sh_ctx: SemiHonestContext<'a>,
-    malicious_validator: MaliciousValidator<'a, F>,
-    binary_malicious_validator: MaliciousValidator<'a, Gf2>,
+pub async fn secure_attribution<'a, F, BK, G>(
+    sh_ctx: SemiHonestContext<'a, G>,
+    malicious_validator: MaliciousValidator<'a, F, G>,
+    binary_malicious_validator: MaliciousValidator<'a, Gf2, G>,
     sorted_match_keys: Vec<Vec<AdditiveShare<Gf2>>>,
     sorted_rows: Vec<IPAModulusConvertedInputRow<F, AdditiveShare<F>>>,
     config: IpaQueryConfig,
 ) -> Result<Vec<MCAggregateCreditOutputRow<F, SemiHonestAdditiveShare<F>, BK>>, Error>
 where
     F: PrimeField + ExtendableField,
+    G: Gate,
     BK: GaloisField,
     AdditiveShare<F>: Serializable,
     SemiHonestAdditiveShare<F>: Serializable,

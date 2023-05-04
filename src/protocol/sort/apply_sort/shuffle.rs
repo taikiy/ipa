@@ -9,6 +9,7 @@ use crate::{
             shuffle::{shuffle_for_helper, ShuffleOrUnshuffle},
             ShuffleStep::{self, Step1, Step2, Step3},
         },
+        step::Gate,
         NoRecord, RecordId,
     },
     repeat64str,
@@ -36,7 +37,7 @@ impl From<usize> for InnerVectorElementStep {
 /// i)   2 helpers receive permutation pair and choose the permutation to be applied
 /// ii)  2 helpers apply the permutation to their shares
 /// iii) reshare to `to_helper`
-async fn shuffle_once<C, I>(
+async fn shuffle_once<C, G, I>(
     mut input: Vec<I>,
     random_permutations: (&[u32], &[u32]),
     shuffle_or_unshuffle: ShuffleOrUnshuffle,
@@ -44,8 +45,9 @@ async fn shuffle_once<C, I>(
     which_step: ShuffleStep,
 ) -> Result<Vec<I>, Error>
 where
-    C: Context,
-    I: Reshare<C, RecordId> + Send + Sync,
+    C: Context<G>,
+    G: Gate,
+    I: Reshare<C, G, RecordId> + Send + Sync,
 {
     let to_helper = shuffle_for_helper(which_step);
     let ctx = ctx.narrow(&which_step);
@@ -74,14 +76,15 @@ where
 /// The Shuffle object receives a step function and appends a `ShuffleStep` to form a concrete step
 ///
 /// ![Shuffle steps][shuffle]
-pub async fn shuffle_shares<C, I>(
+pub async fn shuffle_shares<C, G, I>(
     input: Vec<I>,
     random_permutations: (&[u32], &[u32]),
     ctx: C,
 ) -> Result<Vec<I>, Error>
 where
-    C: Context,
-    I: Reshare<C, RecordId> + Send + Sync,
+    C: Context<G>,
+    G: Gate,
+    I: Reshare<C, G, RecordId> + Send + Sync,
 {
     let input = shuffle_once(
         input,

@@ -29,18 +29,20 @@ use crate::{
     },
 };
 
-pub trait BasicProtocols<C: Context, V: SharedValue>:
-    Reshare<C, RecordId>
-    + Reveal<C, RecordId, Output = V>
-    + SecureMul<C>
-    + ShareKnownValue<C, V>
-    + SumOfProducts<C>
+use super::step::Gate;
+
+pub trait BasicProtocols<C: Context<G>, G: Gate, V: SharedValue>:
+    Reshare<C, G, RecordId>
+    + Reveal<C, G, RecordId, Output = V>
+    + SecureMul<C, G>
+    + ShareKnownValue<C, G, V>
+    + SumOfProducts<C, G>
 {
 }
 
-impl<'a, F: Field> BasicProtocols<SemiHonestContext<'a>, F> for AdditiveShare<F> {}
+impl<'a, F: Field, G: Gate> BasicProtocols<SemiHonestContext<'a, G>, G, F> for AdditiveShare<F> {}
 
-impl<'a, F: Field + ExtendableField> BasicProtocols<MaliciousContext<'a, F>, F>
+impl<'a, F: Field + ExtendableField, G: Gate> BasicProtocols<MaliciousContext<'a, F, G>, G, F>
     for MaliciousAdditiveShare<F>
 {
 }

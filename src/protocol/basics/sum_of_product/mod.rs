@@ -3,6 +3,7 @@ use crate::{
     ff::Field,
     protocol::{
         context::{Context, MaliciousContext, SemiHonestContext},
+        step::Gate,
         RecordId,
     },
     secret_sharing::replicated::{
@@ -16,7 +17,7 @@ pub(crate) mod malicious;
 mod semi_honest;
 
 #[async_trait]
-pub trait SumOfProducts<C: Context>: Sized {
+pub trait SumOfProducts<C: Context<G>, G: Gate>: Sized {
     async fn sum_of_products<'fut>(
         ctx: C,
         record_id: RecordId,
@@ -28,9 +29,9 @@ pub trait SumOfProducts<C: Context>: Sized {
 }
 
 #[async_trait]
-impl<'a, F: Field> SumOfProducts<SemiHonestContext<'a>> for Replicated<F> {
+impl<'a, F: Field, G: Gate> SumOfProducts<SemiHonestContext<'a, G>, G> for Replicated<F> {
     async fn sum_of_products<'fut>(
-        ctx: SemiHonestContext<'a>,
+        ctx: SemiHonestContext<'a, G>,
         record_id: RecordId,
         a: &[Self],
         b: &[Self],
@@ -43,11 +44,11 @@ impl<'a, F: Field> SumOfProducts<SemiHonestContext<'a>> for Replicated<F> {
 }
 
 #[async_trait]
-impl<'a, F: Field + ExtendableField> SumOfProducts<MaliciousContext<'a, F>>
+impl<'a, F: Field + ExtendableField, G: Gate> SumOfProducts<MaliciousContext<'a, F, G>, G>
     for MaliciousReplicated<F>
 {
     async fn sum_of_products<'fut>(
-        ctx: MaliciousContext<'a, F>,
+        ctx: MaliciousContext<'a, F, G>,
         record_id: RecordId,
         a: &[Self],
         b: &[Self],

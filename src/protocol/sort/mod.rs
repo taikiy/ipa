@@ -22,6 +22,8 @@ use crate::{
 };
 use std::fmt::Debug;
 
+use super::step::Gate;
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum SortStep {
     BitPermutationStep,
@@ -157,15 +159,16 @@ impl AsRef<str> for MultiBitPermutationStep {
 ///
 /// # Errors
 /// If any multiplication fails, or if the record is too long (e.g. more than 64 multiplications required)
-pub async fn check_everything<F, C, S>(
+pub async fn check_everything<F, C, G, S>(
     ctx: C,
     record_idx: usize,
     record: &[S],
 ) -> Result<Vec<S>, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let num_bits = record.len();
     let precomputed_combinations =
@@ -249,7 +252,7 @@ where
 // The next step is to mulitply all of these values of `x_3` and append them to the end of the array.
 // Now the array is `[1, x_1, x_2, x_1*x_2, x_3, x_1*x_3, x_2*x_3, x_1*x_2*x_3]`
 // This process continues for as many steps as there are bits of input.
-async fn pregenerate_all_combinations<F, C, S>(
+async fn pregenerate_all_combinations<F, C, G, S>(
     ctx: C,
     record_idx: usize,
     input: &[S],
@@ -257,8 +260,9 @@ async fn pregenerate_all_combinations<F, C, S>(
 ) -> Result<Vec<S>, Error>
 where
     F: Field,
-    C: Context,
-    S: SecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: SecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let record_id = RecordId::from(record_idx);
     let mut precomputed_combinations = Vec::with_capacity(1 << num_bits);

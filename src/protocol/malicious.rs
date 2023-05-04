@@ -21,6 +21,8 @@ use std::{
     fmt::{Debug, Formatter},
 };
 
+use super::step::Gate;
+
 /// Steps used by the validation component of malicious protocol execution.
 /// In addition to these, an implicit step is used to initialize the value of `r`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -170,17 +172,17 @@ impl<F: Field + ExtendableField> MaliciousValidatorAccumulator<F> {
     }
 }
 
-pub struct MaliciousValidator<'a, F: Field + ExtendableField> {
+pub struct MaliciousValidator<'a, F: Field + ExtendableField, G: Gate> {
     r_share: Replicated<F::ExtendedField>,
     u_and_w: Arc<Mutex<AccumulatorState<F::ExtendedField>>>,
-    protocol_ctx: MaliciousContext<'a, F>,
-    validate_ctx: SemiHonestContext<'a>,
+    protocol_ctx: MaliciousContext<'a, F, G>,
+    validate_ctx: SemiHonestContext<'a, G>,
 }
 
-impl<'a, F: Field + ExtendableField> MaliciousValidator<'a, F> {
+impl<'a, F: Field + ExtendableField, G: Gate> MaliciousValidator<'a, F, G> {
     #[must_use]
     #[allow(clippy::needless_pass_by_value)]
-    pub fn new(ctx: SemiHonestContext<'a>) -> MaliciousValidator<F> {
+    pub fn new(ctx: SemiHonestContext<'a, G>) -> MaliciousValidator<F, G> {
         // Use the current step in the context for initialization.
         let r_share: Replicated<F::ExtendedField> = ctx.prss().generate_replicated(RecordId::FIRST);
         let prss = ctx.prss();
@@ -207,7 +209,7 @@ impl<'a, F: Field + ExtendableField> MaliciousValidator<'a, F> {
     }
 
     /// Get a copy of the context that can be used for malicious protocol execution.
-    pub fn context<'b>(&'b self) -> MaliciousContext<'a, F> {
+    pub fn context<'b>(&'b self) -> MaliciousContext<'a, F, G> {
         self.protocol_ctx.clone()
     }
 
@@ -276,7 +278,7 @@ impl<'a, F: Field + ExtendableField> MaliciousValidator<'a, F> {
     }
 }
 
-impl<F: Field + ExtendableField> Debug for MaliciousValidator<'_, F> {
+impl<F: Field + ExtendableField, G: Gate> Debug for MaliciousValidator<'_, F, G> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "MaliciousValidator<{:?}>", type_name::<F>())
     }

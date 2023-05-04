@@ -3,8 +3,11 @@ use crate::{
     error::Error,
     ff::{Field, Gf2},
     protocol::{
-        basics::SecureMul, boolean::all_zeroes, context::Context, step::BitOpStep, BasicProtocols,
-        RecordId,
+        basics::SecureMul,
+        boolean::all_zeroes,
+        context::Context,
+        step::{BitOpStep, Gate},
+        BasicProtocols, RecordId,
     },
     secret_sharing::Linear as LinearSecretSharing,
 };
@@ -17,7 +20,7 @@ use std::iter::zip;
 ///
 /// # Panics
 /// if `a.len() > 128`
-pub async fn bitwise_equal_constant<F, C, S>(
+pub async fn bitwise_equal_constant<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     a: &[S],
@@ -25,8 +28,9 @@ pub async fn bitwise_equal_constant<F, C, S>(
 ) -> Result<S, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     assert!(a.len() <= 128);
 
@@ -50,15 +54,16 @@ where
 /// # Errors
 /// Propagates errors from multiplications
 ///
-pub async fn bitwise_equal_gf2<C, S>(
+pub async fn bitwise_equal_gf2<C, G, S>(
     ctx: C,
     record_id: RecordId,
     a: &[S],
     b: &[S],
 ) -> Result<S, Error>
 where
-    C: Context,
-    S: LinearSecretSharing<Gf2> + BasicProtocols<C, Gf2>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<Gf2> + BasicProtocols<C, G, Gf2>,
 {
     debug_assert!(a.len() == b.len());
     let c = zip(a.iter(), b.iter())
@@ -71,7 +76,7 @@ where
 /// # Errors
 /// Propagates errors from multiplications
 ///
-pub async fn bitwise_equal<F, C, S>(
+pub async fn bitwise_equal<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     a: &[S],
@@ -79,15 +84,16 @@ pub async fn bitwise_equal<F, C, S>(
 ) -> Result<S, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     debug_assert!(a.len() == b.len());
     let xored_bits = xor_all_the_bits(ctx.narrow(&Step::XORAllTheBits), record_id, a, b).await?;
     all_zeroes(ctx, record_id, &xored_bits).await
 }
 
-async fn xor_all_the_bits<F, C, S>(
+async fn xor_all_the_bits<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     a: &[S],
@@ -95,8 +101,9 @@ async fn xor_all_the_bits<F, C, S>(
 ) -> Result<Vec<S>, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + SecureMul<C, G>,
 {
     // This is truly a parallel operation across the bits of the input.
     ctx.parallel_join(zip(a, b).enumerate().map(|(i, (a_bit, b_bit))| {

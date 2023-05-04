@@ -20,7 +20,7 @@ use crate::{
                 malicious_generate_permutation_and_reveal_shuffled,
             },
         },
-        step::BitOpStep,
+        step::{BitOpStep, Gate},
         BasicProtocols, RecordId,
     },
     secret_sharing::{
@@ -43,8 +43,8 @@ const SIMPLE_AGGREGATION_BREAK_EVEN_POINT: u32 = 32;
 ///
 /// # Errors
 /// propagates errors from multiplications
-pub async fn aggregate_credit<F, BK>(
-    ctx: SemiHonestContext<'_>,
+pub async fn aggregate_credit<F, BK, G>(
+    ctx: SemiHonestContext<'_, G>,
     capped_credits: impl Iterator<Item = MCAggregateCreditInputRow<F, Replicated<F>>>,
     max_breakdown_key: u32,
     num_multi_bits: u32,
@@ -52,7 +52,8 @@ pub async fn aggregate_credit<F, BK>(
 where
     F: Field,
     BK: GaloisField,
-    for<'a> Replicated<F>: Serializable + BasicProtocols<SemiHonestContext<'a>, F>,
+    G: Gate,
+    for<'a> Replicated<F>: Serializable + BasicProtocols<SemiHonestContext<'a, G>, G, F>,
 {
     if max_breakdown_key <= SIMPLE_AGGREGATION_BREAK_EVEN_POINT {
         return simple_aggregate_credit(ctx, capped_credits, max_breakdown_key).await;
@@ -60,11 +61,12 @@ where
     //
     // 1. Add aggregation bits and new rows per unique breakdown_key
     //
-    let capped_credits_with_aggregation_bits = add_aggregation_bits_and_breakdown_keys::<_, _, _, BK>(
-        &ctx,
-        capped_credits,
-        max_breakdown_key,
-    );
+    let capped_credits_with_aggregation_bits =
+        add_aggregation_bits_and_breakdown_keys::<_, _, _, _, BK>(
+            &ctx,
+            capped_credits,
+            max_breakdown_key,
+        );
 
     //
     // 2. Sort by `breakdown_key`. Rows with `aggregation_bit` = 0 must
@@ -133,15 +135,15 @@ where
 ///
 /// # Errors
 /// propagates errors from multiplications
-pub async fn malicious_aggregate_credit<'a, F, BK>(
-    malicious_validator: MaliciousValidator<'a, F>,
-    sh_ctx: SemiHonestContext<'a>,
+pub async fn malicious_aggregate_credit<'a, F, BK, G>(
+    malicious_validator: MaliciousValidator<'a, F, G>,
+    sh_ctx: SemiHonestContext<'a, G>,
     capped_credits: impl Iterator<Item = MCAggregateCreditInputRow<F, MaliciousReplicated<F>>>,
     max_breakdown_key: u32,
     num_multi_bits: u32,
 ) -> Result<
     (
-        MaliciousValidator<'a, F>,
+        MaliciousValidator<'a, F, G>,
         Vec<MCAggregateCreditOutputRow<F, MaliciousReplicated<F>, BK>>,
     ),
     Error,
@@ -149,7 +151,8 @@ pub async fn malicious_aggregate_credit<'a, F, BK>(
 where
     F: Field + ExtendableField,
     BK: GaloisField,
-    MaliciousReplicated<F>: Serializable + BasicProtocols<MaliciousContext<'a, F>, F>,
+    G: Gate,
+    MaliciousReplicated<F>: Serializable + BasicProtocols<MaliciousContext<'a, F, G>, G, F>,
 {
     let m_ctx = malicious_validator.context();
 
@@ -158,11 +161,12 @@ where
         return Ok((malicious_validator, res));
     }
 
-    let capped_credits_with_aggregation_bits = add_aggregation_bits_and_breakdown_keys::<_, _, _, BK>(
-        &m_ctx,
-        capped_credits,
-        max_breakdown_key,
-    );
+    let capped_credits_with_aggregation_bits =
+        add_aggregation_bits_and_breakdown_keys::<_, _, _, _, BK>(
+            &m_ctx,
+            capped_credits,
+            max_breakdown_key,
+        );
 
     let capped_credits_with_aggregation_bits = malicious_validator
         .validate(capped_credits_with_aggregation_bits)
@@ -234,15 +238,16 @@ where
     Ok((malicious_validator, result))
 }
 
-async fn simple_aggregate_credit<F, C, T, BK>(
+async fn simple_aggregate_credit<F, C, T, G, BK>(
     ctx: C,
     capped_credits: impl Iterator<Item = MCAggregateCreditInputRow<F, T>>,
     max_breakdown_key: u32,
 ) -> Result<Vec<MCAggregateCreditOutputRow<F, T, BK>>, Error>
 where
     F: Field,
-    C: Context,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F> + Serializable,
+    C: Context<G>,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F> + Serializable,
+    G: Gate,
     BK: GaloisField,
 {
     let mut sums = vec![T::ZERO; max_breakdown_key as usize];
@@ -319,15 +324,16 @@ where
         .collect())
 }
 
-fn add_aggregation_bits_and_breakdown_keys<F, C, T, BK>(
+fn add_aggregation_bits_and_breakdown_keys<F, C, T, G, BK>(
     ctx: &C,
     capped_credits: impl Iterator<Item = MCAggregateCreditInputRow<F, T>>,
     max_breakdown_key: u32,
 ) -> Vec<MCCappedCreditsWithAggregationBit<F, T>>
 where
     F: Field,
-    C: Context,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+    G: Gate,
     BK: GaloisField,
 {
     let zero = T::ZERO;
@@ -373,8 +379,8 @@ where
     unique_breakdown_keys
 }
 
-async fn sort_by_breakdown_key<F: Field>(
-    ctx: SemiHonestContext<'_>,
+async fn sort_by_breakdown_key<F: Field, G: Gate>(
+    ctx: SemiHonestContext<'_, G>,
     input: Vec<MCCappedCreditsWithAggregationBit<F, Replicated<F>>>,
     max_breakdown_key: u32,
     num_multi_bits: u32,
@@ -405,14 +411,14 @@ async fn sort_by_breakdown_key<F: Field>(
     .await
 }
 
-async fn malicious_sort_by_breakdown_key<F: Field + ExtendableField>(
-    ctx: SemiHonestContext<'_>,
+async fn malicious_sort_by_breakdown_key<F: Field + ExtendableField, G: Gate>(
+    ctx: SemiHonestContext<'_, G>,
     input: Vec<MCCappedCreditsWithAggregationBit<F, Replicated<F>>>,
     max_breakdown_key: u32,
     num_multi_bits: u32,
 ) -> Result<
     (
-        MaliciousValidator<'_, F>,
+        MaliciousValidator<'_, F, G>,
         Vec<MCCappedCreditsWithAggregationBit<F, MaliciousReplicated<F>>>,
     ),
     Error,
@@ -449,8 +455,8 @@ async fn malicious_sort_by_breakdown_key<F: Field + ExtendableField>(
     ))
 }
 
-async fn sort_by_aggregation_bit<F: Field>(
-    ctx: SemiHonestContext<'_>,
+async fn sort_by_aggregation_bit<F: Field, G: Gate>(
+    ctx: SemiHonestContext<'_, G>,
     input: Vec<MCCappedCreditsWithAggregationBit<F, Replicated<F>>>,
 ) -> Result<Vec<MCCappedCreditsWithAggregationBit<F, Replicated<F>>>, Error> {
     // Since aggregation_bit is a 1-bit share of 1 or 0, we'll just extract the
@@ -474,12 +480,12 @@ async fn sort_by_aggregation_bit<F: Field>(
     .await
 }
 
-async fn malicious_sort_by_aggregation_bit<'a, F: Field + ExtendableField>(
-    ctx: SemiHonestContext<'_>,
+async fn malicious_sort_by_aggregation_bit<'a, F: Field + ExtendableField, G: Gate>(
+    ctx: SemiHonestContext<'_, G>,
     input: Vec<MCCappedCreditsWithAggregationBit<F, Replicated<F>>>,
 ) -> Result<
     (
-        MaliciousValidator<'_, F>,
+        MaliciousValidator<'_, F, G>,
         Vec<MCCappedCreditsWithAggregationBit<F, MaliciousReplicated<F>>>,
     ),
     Error,

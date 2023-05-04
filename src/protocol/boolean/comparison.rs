@@ -5,7 +5,7 @@ use crate::{
     protocol::{
         boolean::{random_bits_generator::RandomBitsGenerator, RandomBits},
         context::Context,
-        step::BitOpStep,
+        step::{BitOpStep, Gate},
         BasicProtocols, RecordId,
     },
     secret_sharing::Linear as LinearSecretSharing,
@@ -60,17 +60,18 @@ use crate::{
 ///
 /// # Panics
 /// If `c` is not less than `F::PRIME`.
-pub async fn greater_than_constant<F, C, S>(
+pub async fn greater_than_constant<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
-    rbg: &RandomBitsGenerator<F, S, C>,
+    rbg: &RandomBitsGenerator<F, S, C, G>,
     a: &S,
     c: u128,
 ) -> Result<S, Error>
 where
     F: PrimeField,
-    C: Context + RandomBits<F, Share = S>,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G> + RandomBits<F, Share = S>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     use GreaterThanConstantStep as Step;
 
@@ -175,7 +176,7 @@ impl AsRef<str> for GreaterThanConstantStep {
 ///
 /// # Panics
 /// if bitwise share `a` is longer than 128 bits.
-pub async fn bitwise_greater_than_constant<F, C, S>(
+pub async fn bitwise_greater_than_constant<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     a: &[S],
@@ -183,8 +184,9 @@ pub async fn bitwise_greater_than_constant<F, C, S>(
 ) -> Result<S, Error>
 where
     F: PrimeField,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     assert!(a.len() <= 128);
 
@@ -207,7 +209,7 @@ where
 ///
 /// # Panics
 /// if bitwise share `a` is longer than 128 bits.
-pub async fn bitwise_less_than_constant<F, C, S>(
+pub async fn bitwise_less_than_constant<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     a: &[S],
@@ -215,8 +217,9 @@ pub async fn bitwise_less_than_constant<F, C, S>(
 ) -> Result<S, Error>
 where
     F: PrimeField,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     assert!(a.len() <= 128);
 
@@ -237,7 +240,7 @@ where
     .await
 }
 
-async fn first_differing_bit<F, C, S>(
+async fn first_differing_bit<F, C, G, S>(
     ctx: &C,
     record_id: RecordId,
     a: &[S],
@@ -245,8 +248,9 @@ async fn first_differing_bit<F, C, S>(
 ) -> Result<Vec<S>, Error>
 where
     F: PrimeField,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let one = S::share_known_value(ctx, F::ONE);
 

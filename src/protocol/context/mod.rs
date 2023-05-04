@@ -5,7 +5,7 @@ mod semi_honest;
 use crate::{
     helpers::{Message, ReceivingEnd, Role, SendingEnd, TotalRecords},
     protocol::{
-        step::{self, Step},
+        step::{Gate, Step},
         RecordId,
     },
     seq_join::SeqJoin,
@@ -17,13 +17,16 @@ pub use semi_honest::SemiHonestContext;
 
 /// Context used by each helper to perform secure computation. Provides access to shared randomness
 /// generator and communication channel.
-pub trait Context: Clone + Send + Sync + SeqJoin {
+pub trait Context<G>: Clone + Send + Sync + SeqJoin
+where
+    G: Gate,
+{
     /// The role of this context.
     fn role(&self) -> Role;
 
     /// A unique identifier for this stage of the protocol execution.
     #[must_use]
-    fn step(&self) -> &step::Descriptive;
+    fn step(&self) -> &G;
 
     /// Make a sub-context.
     /// Note that each invocation of this should use a unique value of `step`.
@@ -74,7 +77,7 @@ mod tests {
         protocol::{
             malicious::{MaliciousValidator, Step::MaliciousProtocol},
             prss::SharedRandomness,
-            step::StepNarrow,
+            step::{self, StepNarrow},
             RecordId,
         },
         secret_sharing::replicated::{
@@ -127,11 +130,12 @@ mod tests {
     }
 
     /// Toy protocol to execute PRSS generation and send/receive logic
-    async fn toy_protocol<F, S, C>(ctx: C, index: usize, share: &S) -> Replicated<F>
+    async fn toy_protocol<F, S, C, G>(ctx: C, index: usize, share: &S) -> Replicated<F>
     where
         F: Field,
         Standard: Distribution<F>,
-        C: Context,
+        C: Context<G>,
+        G: Gate,
         S: AsReplicatedTestOnly<F>,
     {
         let ctx = ctx.narrow("metrics");

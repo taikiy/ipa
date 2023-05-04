@@ -8,7 +8,7 @@ use crate::{
         },
         malicious::MaliciousValidatorAccumulator,
         prss::Endpoint as PrssEndpoint,
-        step::{self, Step, StepNarrow},
+        step::{Gate, Step, StepNarrow},
         RecordId,
     },
     secret_sharing::replicated::{
@@ -25,20 +25,20 @@ use std::{
 /// Context for protocol executions suitable for semi-honest security model, i.e. secure against
 /// honest-but-curious adversary parties.
 #[derive(Clone)]
-pub struct SemiHonestContext<'a> {
+pub struct SemiHonestContext<'a, G: Gate> {
     /// TODO (alex): Arc is required here because of the `TestWorld` structure. Real world
     /// may operate with raw references and be more efficient
     pub(super) inner: Arc<ContextInner<'a>>,
-    pub(super) step: step::Descriptive,
+    pub(super) step: G,
     pub(super) total_records: TotalRecords,
 }
 
-impl<'a> SemiHonestContext<'a> {
+impl<'a, G: Gate> SemiHonestContext<'a, G> {
     pub fn new(participant: &'a PrssEndpoint, gateway: &'a Gateway) -> Self {
         Self::new_complete(
             participant,
             gateway,
-            step::Descriptive::default(),
+            G::default(),
             TotalRecords::Unspecified,
         )
     }
@@ -48,18 +48,13 @@ impl<'a> SemiHonestContext<'a> {
         gateway: &'a Gateway,
         total_records: TotalRecords,
     ) -> Self {
-        Self::new_complete(
-            participant,
-            gateway,
-            step::Descriptive::default(),
-            total_records,
-        )
+        Self::new_complete(participant, gateway, G::default(), total_records)
     }
 
     pub(super) fn new_complete(
         participant: &'a PrssEndpoint,
         gateway: &'a Gateway,
-        step: step::Descriptive,
+        step: G,
         total_records: TotalRecords,
     ) -> Self {
         Self {
@@ -80,17 +75,17 @@ impl<'a> SemiHonestContext<'a> {
         malicious_step: &S,
         accumulator: MaliciousValidatorAccumulator<F>,
         r_share: Replicated<F::ExtendedField>,
-    ) -> MaliciousContext<'a, F> {
+    ) -> MaliciousContext<'a, F, G> {
         MaliciousContext::new(&self, malicious_step, accumulator, r_share)
     }
 }
 
-impl<'a> Context for SemiHonestContext<'a> {
+impl<'a, G: Gate> Context<G> for SemiHonestContext<'a, G> {
     fn role(&self) -> Role {
         self.inner.gateway.role()
     }
 
-    fn step(&self) -> &step::Descriptive {
+    fn step(&self) -> &G {
         &self.step
     }
 
@@ -146,13 +141,13 @@ impl<'a> Context for SemiHonestContext<'a> {
     }
 }
 
-impl SeqJoin for SemiHonestContext<'_> {
+impl<G: Gate> SeqJoin for SemiHonestContext<'_, G> {
     fn active_work(&self) -> NonZeroUsize {
         self.inner.gateway.config().active_work()
     }
 }
 
-impl Debug for SemiHonestContext<'_> {
+impl<G: Gate> Debug for SemiHonestContext<'_, G> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "SemiHonestContext")
     }

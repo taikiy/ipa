@@ -1,14 +1,14 @@
 use crate::{
     error::Error,
     ff::Field,
-    protocol::{basics::SecureMul, context::Context, RecordId},
+    protocol::{basics::SecureMul, context::Context, step::Gate, RecordId},
     secret_sharing::Linear as LinearSecretSharing,
 };
 
 /// Returns `true_value` if `condition` is a share of 1, else `false_value`.
 /// # Errors
 /// If the protocol fails to execute.
-pub async fn if_else<F, C, S>(
+pub async fn if_else<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     condition: &S,
@@ -17,8 +17,9 @@ pub async fn if_else<F, C, S>(
 ) -> Result<S, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + SecureMul<C, G>,
 {
     // If `condition` is a share of 1 (true), then
     //   = false_value + 1 * (true_value - false_value)

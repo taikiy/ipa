@@ -4,6 +4,7 @@ use crate::{
     ff::PrimeField,
     protocol::{
         context::{Context, SemiHonestContext},
+        step::Gate,
         RecordId,
     },
     secret_sharing::replicated::semi_honest::AdditiveShare as Replicated,
@@ -11,7 +12,7 @@ use crate::{
 use async_trait::async_trait;
 
 #[async_trait]
-impl<F: PrimeField> RandomBits<F> for SemiHonestContext<'_> {
+impl<F: PrimeField, G: Gate> RandomBits<F> for SemiHonestContext<'_, G> {
     type Share = Replicated<F>;
 
     /// Generates a sequence of `l` random bit sharings in the target field `F`.

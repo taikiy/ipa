@@ -10,7 +10,7 @@ use crate::{
         attribution::input::MCAggregateCreditOutputRow,
         context::SemiHonestContext,
         ipa::{ipa, IPAInputRow},
-        step::{self, StepNarrow},
+        step::{self, Gate, StepNarrow},
         BreakdownKey, MatchKey,
     },
     secret_sharing::{
@@ -67,8 +67,8 @@ where
 }
 
 #[cfg(any(test, feature = "cli", feature = "test-fixture"))]
-async fn execute_test_multiply<F: Field>(
-    ctx: SemiHonestContext<'_>,
+async fn execute_test_multiply<F: Field, G: Gate>(
+    ctx: SemiHonestContext<'_, G>,
     mut input: AlignedByteArrStream,
 ) -> std::result::Result<Vec<Replicated<F>>, Error>
 where
@@ -102,8 +102,8 @@ where
     Ok(results)
 }
 
-async fn execute_ipa<F: PrimeField, MK: GaloisField, BK: GaloisField>(
-    ctx: SemiHonestContext<'_>,
+async fn execute_ipa<F: PrimeField, MK: GaloisField, BK: GaloisField, G: Gate>(
+    ctx: SemiHonestContext<'_, G>,
     query_config: IpaQueryConfig,
     mut input: AlignedByteArrStream,
 ) -> std::result::Result<Vec<MCAggregateCreditOutputRow<F, Replicated<F>, BK>>, Error>

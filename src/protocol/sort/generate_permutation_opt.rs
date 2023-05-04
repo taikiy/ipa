@@ -13,7 +13,7 @@ use crate::{
             secureapplyinv::secureapplyinv_multi,
             SortStep::{BitPermutationStep, ComposeStep, MultiApplyInv, ShuffleRevealPermutation},
         },
-        step::IpaProtocolStep::Sort,
+        step::{Gate, IpaProtocolStep::Sort},
     },
     secret_sharing::replicated::{
         malicious::{AdditiveShare as MaliciousReplicated, ExtendableField},
@@ -45,13 +45,14 @@ use embed_doc_image::embed_doc_image;
 /// If any underlying protocol fails
 /// # Panics
 /// Panics if input doesn't have same number of bits as `num_bits`
-pub async fn generate_permutation_opt<F>(
-    ctx: SemiHonestContext<'_>,
+pub async fn generate_permutation_opt<F, G>(
+    ctx: SemiHonestContext<'_, G>,
     mut sort_keys: impl Iterator<Item = &Vec<Vec<Replicated<F>>>>,
     //TODO (richaj) implement MultiBitChunk which is discussed in PR #425
 ) -> Result<Vec<Replicated<F>>, Error>
 where
     F: Field,
+    G: Gate,
 {
     let ctx_0 = ctx.clone();
     let first_keys = sort_keys.next().unwrap();
@@ -142,12 +143,13 @@ where
 /// # Panics
 /// If sort keys dont have num of bits same as `num_bits`
 /// # Errors
-pub async fn malicious_generate_permutation_opt<'a, F, I>(
-    sh_ctx: SemiHonestContext<'_>,
+pub async fn malicious_generate_permutation_opt<'a, F, G, I>(
+    sh_ctx: SemiHonestContext<'_, G>,
     sort_keys: I,
-) -> Result<(MaliciousValidator<'_, F>, Vec<MaliciousReplicated<F>>), Error>
+) -> Result<(MaliciousValidator<'_, F, G>, Vec<MaliciousReplicated<F>>), Error>
 where
     F: Field + ExtendableField,
+    G: Gate,
     I: IntoIterator<Item = &'a Vec<Vec<Replicated<F>>>>,
 {
     let mut malicious_validator = MaliciousValidator::new(sh_ctx.clone());

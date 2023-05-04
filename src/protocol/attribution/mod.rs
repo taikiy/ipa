@@ -23,6 +23,7 @@ use super::{
     boolean::bitwise_equal::bitwise_equal_gf2,
     context::SemiHonestContext,
     modulus_conversion::{convert_bit, convert_bit_local, BitConversionTriple},
+    step::Gate,
 };
 
 /// Computes a "prefix-OR" operation starting on each element in the list.
@@ -42,7 +43,7 @@ use super::{
 /// ## Panics
 /// Nah, it doesn't.
 ///
-pub async fn prefix_or_binary_tree_style<F, C, S>(
+pub async fn prefix_or_binary_tree_style<F, C, S, G>(
     ctx: C,
     stop_bits: &[S],
     uncapped_credits: &[S],
@@ -50,8 +51,9 @@ pub async fn prefix_or_binary_tree_style<F, C, S>(
 ) -> Result<Vec<S>, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+    G: Gate,
 {
     assert_eq!(stop_bits.len() + 1, uncapped_credits.len());
 
@@ -147,15 +149,16 @@ where
 /// ## Panics
 /// Nah, it doesn't.
 ///
-pub async fn do_the_binary_tree_thing<F, C, S>(
+pub async fn do_the_binary_tree_thing<F, C, S, G>(
     ctx: C,
     mut stop_bits: Vec<S>,
     values: &mut [S],
 ) -> Result<(), Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    S: LinearSecretSharing<F> + SecureMul<C, G>,
+    G: Gate,
 {
     let num_rows = values.len();
 
@@ -219,15 +222,16 @@ where
     Ok(())
 }
 
-async fn compute_stop_bits<F, S, C>(
+async fn compute_stop_bits<F, S, C, G>(
     ctx: C,
     is_trigger_bits: &[S],
     helper_bits: &[S],
 ) -> Result<impl Iterator<Item = S>, Error>
 where
     F: Field,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
-    C: Context,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+    C: Context<G>,
+    G: Gate,
 {
     let stop_bits_ctx = ctx
         .narrow(&Step::ComputeStopBits)
@@ -244,13 +248,14 @@ where
     Ok(empty().chain(ctx.try_join(futures).await?))
 }
 
-async fn compute_helper_bits_gf2<C, S>(
+async fn compute_helper_bits_gf2<C, S, G>(
     ctx: C,
     sorted_match_keys: &[Vec<S>],
 ) -> Result<Vec<S>, Error>
 where
-    C: Context,
-    S: LinearSecretSharing<Gf2> + BasicProtocols<C, Gf2>,
+    C: Context<G>,
+    S: LinearSecretSharing<Gf2> + BasicProtocols<C, G, Gf2>,
+    G: Gate,
 {
     let narrowed_ctx = ctx
         .narrow(&Step::ComputeHelperBits)
@@ -264,12 +269,13 @@ where
     .await
 }
 
-async fn mod_conv_helper_bits<F>(
-    sh_ctx: SemiHonestContext<'_>,
+async fn mod_conv_helper_bits<F, G>(
+    sh_ctx: SemiHonestContext<'_, G>,
     semi_honest_helper_bits_gf2: &[Replicated<Gf2>],
 ) -> Result<Vec<Replicated<F>>, Error>
 where
     F: Field,
+    G: Gate,
 {
     let hb_mod_conv_ctx = sh_ctx
         .narrow(&Step::ModConvHelperBits)

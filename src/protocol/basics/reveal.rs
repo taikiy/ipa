@@ -7,6 +7,7 @@ use crate::{
     protocol::{
         context::{Context, MaliciousContext, SemiHonestContext},
         sort::generate_permutation::ShuffledPermutationWrapper,
+        step::Gate,
         NoRecord, RecordBinding, RecordId,
     },
     secret_sharing::{
@@ -23,7 +24,7 @@ use futures::future::try_join;
 
 /// Trait for reveal protocol to open a shared secret to all helpers inside the MPC ring.
 #[async_trait]
-pub trait Reveal<C: Context, B: RecordBinding>: Sized {
+pub trait Reveal<C: Context<G>, G: Gate, B: RecordBinding>: Sized {
     type Output;
     /// reveal the secret to all helpers in MPC circuit. Note that after method is called,
     /// it must be assumed that the secret value has been revealed to at least one of the helpers.
@@ -46,16 +47,16 @@ pub trait Reveal<C: Context, B: RecordBinding>: Sized {
 /// i.e. their own shares and received share.
 #[async_trait]
 #[embed_doc_image("reveal", "images/reveal.png")]
-impl<'a, F: Field> Reveal<SemiHonestContext<'a>, RecordId> for Replicated<F> {
+impl<'a, F: Field, G: Gate> Reveal<SemiHonestContext<'a, G>, G, RecordId> for Replicated<F> {
     type Output = F;
 
     async fn reveal<'fut>(
         &self,
-        ctx: SemiHonestContext<'a>,
+        ctx: SemiHonestContext<'a, G>,
         record_id: RecordId,
     ) -> Result<F, Error>
     where
-        SemiHonestContext<'a>: 'fut,
+        SemiHonestContext<'a, G>: 'fut,
     {
         let (left, right) = self.as_tuple();
 
@@ -78,18 +79,18 @@ impl<'a, F: Field> Reveal<SemiHonestContext<'a>, RecordId> for Replicated<F> {
 /// to both helpers (right and left) and upon receiving 2 shares from peers it validates that they
 /// indeed match.
 #[async_trait]
-impl<'a, F: Field + ExtendableField> Reveal<MaliciousContext<'a, F>, RecordId>
+impl<'a, F: Field + ExtendableField, G: Gate> Reveal<MaliciousContext<'a, F, G>, G, RecordId>
     for MaliciousReplicated<F>
 {
     type Output = F;
 
     async fn reveal<'fut>(
         &self,
-        ctx: MaliciousContext<'a, F>,
+        ctx: MaliciousContext<'a, F, G>,
         record_id: RecordId,
     ) -> Result<F, Error>
     where
-        MaliciousContext<'a, F>: 'fut,
+        MaliciousContext<'a, F, G>: 'fut,
     {
         use crate::secret_sharing::replicated::malicious::ThisCodeIsAuthorizedToDowngradeFromMalicious;
 
@@ -121,11 +122,12 @@ impl<'a, F: Field + ExtendableField> Reveal<MaliciousContext<'a, F>, RecordId>
 }
 
 #[async_trait]
-impl<F, S, C> Reveal<C, NoRecord> for ShuffledPermutationWrapper<S, C>
+impl<F, S, C, G> Reveal<C, G, NoRecord> for ShuffledPermutationWrapper<S, C, G>
 where
     F: Field,
-    S: SecretSharing<F> + Reveal<C, RecordId, Output = F>,
-    C: Context,
+    S: SecretSharing<F> + Reveal<C, G, RecordId, Output = F>,
+    C: Context<G>,
+    G: Gate,
 {
     type Output = Vec<u32>;
 
@@ -158,6 +160,7 @@ where
 #[cfg(all(test, not(feature = "shuttle"), feature = "in-memory-infra"))]
 mod tests {
     use crate::{
+        protocol::step::Gate,
         rand::{thread_rng, Rng},
         secret_sharing::replicated::malicious::ExtendableField,
         test_fixture::Runner,
@@ -274,8 +277,8 @@ mod tests {
         Ok(())
     }
 
-    pub async fn reveal_with_additive_attack<F: Field + ExtendableField>(
-        ctx: MaliciousContext<'_, F>,
+    pub async fn reveal_with_additive_attack<F: Field + ExtendableField, G: Gate>(
+        ctx: MaliciousContext<'_, F, G>,
         record_id: RecordId,
         input: &MaliciousReplicated<F>,
         additive_error: F,

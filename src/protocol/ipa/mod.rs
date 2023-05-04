@@ -36,6 +36,8 @@ use generic_array::{ArrayLength, GenericArray};
 use std::{marker::PhantomData, ops::Add};
 use typenum::Unsigned;
 
+use super::step::Gate;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Step {
     ModulusConversionForMatchKeys,
@@ -232,11 +234,12 @@ impl<F: Field, T: LinearSecretSharing<F>> IPAModulusConvertedInputRow<F, T> {
 }
 
 #[async_trait]
-impl<F, T, C> Reshare<C, RecordId> for IPAModulusConvertedInputRow<F, T>
+impl<F, T, C, G> Reshare<C, G, RecordId> for IPAModulusConvertedInputRow<F, T>
 where
     F: Field,
-    T: LinearSecretSharing<F> + Reshare<C, RecordId>,
-    C: Context,
+    T: LinearSecretSharing<F> + Reshare<C, G, RecordId>,
+    C: Context<G>,
+    G: Gate,
 {
     async fn reshare<'fut>(
         &self,
@@ -289,8 +292,8 @@ where
 /// Propagates errors from multiplications
 /// # Panics
 /// Propagates errors from multiplications
-pub async fn ipa<F, MK, BK>(
-    ctx: SemiHonestContext<'_>,
+pub async fn ipa<F, MK, BK, G>(
+    ctx: SemiHonestContext<'_, G>,
     input_rows: &[IPAInputRow<F, MK, BK>],
     config: IpaQueryConfig,
 ) -> Result<Vec<MCAggregateCreditOutputRow<F, Replicated<F>, BK>>, Error>
@@ -298,6 +301,7 @@ where
     F: PrimeField,
     MK: GaloisField,
     BK: GaloisField,
+    G: Gate,
     Replicated<F>: Serializable,
 {
     let (mk_shares, bk_shares): (Vec<_>, Vec<_>) = input_rows
@@ -377,8 +381,8 @@ where
 /// # Panics
 /// Propagates errors from multiplications
 #[allow(dead_code, clippy::too_many_lines)]
-pub async fn ipa_malicious<'a, F, MK, BK>(
-    sh_ctx: SemiHonestContext<'a>,
+pub async fn ipa_malicious<'a, F, MK, BK, G>(
+    sh_ctx: SemiHonestContext<'a, G>,
     input_rows: &[IPAInputRow<F, MK, BK>],
     config: IpaQueryConfig,
 ) -> Result<Vec<MCAggregateCreditOutputRow<F, Replicated<F>, BK>>, Error>
@@ -386,10 +390,11 @@ where
     F: PrimeField + ExtendableField,
     MK: GaloisField,
     BK: GaloisField,
-    MaliciousReplicated<F>: Serializable + BasicProtocols<MaliciousContext<'a, F>, F>,
-    Replicated<F>: Serializable + BasicProtocols<SemiHonestContext<'a>, F>,
+    G: Gate,
+    MaliciousReplicated<F>: Serializable + BasicProtocols<MaliciousContext<'a, F, G>, G, F>,
+    Replicated<F>: Serializable + BasicProtocols<SemiHonestContext<'a, G>, G, F>,
 {
-    let malicious_validator = MaliciousValidator::<F>::new(sh_ctx.clone());
+    let malicious_validator = MaliciousValidator::<F, G>::new(sh_ctx.clone());
     let m_ctx = malicious_validator.context();
 
     let (mk_shares, bk_shares): (Vec<_>, Vec<_>) = input_rows
@@ -420,12 +425,12 @@ where
     .unwrap();
 
     let malicious_validator =
-        MaliciousValidator::<F>::new(sh_ctx.narrow(&Step::AfterConvertAllBits));
+        MaliciousValidator::<F, G>::new(sh_ctx.narrow(&Step::AfterConvertAllBits));
     let m_ctx = malicious_validator.context();
 
     let gf2_match_key_bits = get_gf2_match_key_bits(input_rows);
 
-    let binary_validator = MaliciousValidator::<Gf2>::new(sh_ctx.narrow(&Step::BinaryValidator));
+    let binary_validator = MaliciousValidator::<Gf2, G>::new(sh_ctx.narrow(&Step::BinaryValidator));
     let binary_m_ctx = binary_validator.context();
 
     let upgraded_gf2_match_key_bits = binary_m_ctx.upgrade(gf2_match_key_bits).await?;

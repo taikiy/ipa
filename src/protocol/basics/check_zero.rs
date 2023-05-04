@@ -5,6 +5,7 @@ use crate::{
         basics::{reveal::Reveal, SecureMul},
         context::{Context, SemiHonestContext},
         prss::SharedRandomness,
+        step::Gate,
         RecordId,
     },
     secret_sharing::replicated::semi_honest::AdditiveShare as Replicated,
@@ -56,8 +57,8 @@ impl AsRef<str> for Step {
 /// ## Errors
 /// Lots of things may go wrong here, from timeouts to bad output. They will be signalled
 /// back via the error response
-pub async fn check_zero<F: Field>(
-    ctx: SemiHonestContext<'_>,
+pub async fn check_zero<F: Field, G: Gate>(
+    ctx: SemiHonestContext<'_, G>,
     record_id: RecordId,
     v: &Replicated<F>,
 ) -> Result<bool, Error> {

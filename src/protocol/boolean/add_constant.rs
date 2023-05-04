@@ -1,7 +1,12 @@
 use crate::{
     error::Error,
     ff::{Field, PrimeField},
-    protocol::{basics::SecureMul, context::Context, step::BitOpStep, BasicProtocols, RecordId},
+    protocol::{
+        basics::SecureMul,
+        context::Context,
+        step::{BitOpStep, Gate},
+        BasicProtocols, RecordId,
+    },
     secret_sharing::Linear as LinearSecretSharing,
 };
 
@@ -39,7 +44,7 @@ use crate::{
 ///
 /// As such, there are a total of l-2 multiplications (one less than the bit-length of the input).
 /// Sometimes, a multiplication can be skipped, because we know, a prioi that the result must be zero.
-pub async fn add_constant<F, C, S>(
+pub async fn add_constant<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     a: &[S],
@@ -47,8 +52,9 @@ pub async fn add_constant<F, C, S>(
 ) -> Result<Vec<S>, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let mut output = Vec::with_capacity(a.len() + 1);
 
@@ -120,7 +126,7 @@ where
 // `maybe` must be a secret sharing of either `1` or `0`. It should be thought of as a secret-shared boolean.
 //
 // The output is the bitwise `a + (b*maybe)`, modulo `2^el`.
-pub async fn maybe_add_constant_mod2l<F, C, S>(
+pub async fn maybe_add_constant_mod2l<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     a: &[S],
@@ -129,8 +135,9 @@ pub async fn maybe_add_constant_mod2l<F, C, S>(
 ) -> Result<Vec<S>, Error>
 where
     F: PrimeField,
-    C: Context,
-    S: LinearSecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + SecureMul<C, G>,
 {
     let el = usize::try_from(u128::BITS - F::PRIME.into().leading_zeros()).unwrap();
     assert!(a.len() >= el);

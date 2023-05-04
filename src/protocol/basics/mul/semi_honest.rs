@@ -6,6 +6,7 @@ use crate::{
         basics::{mul::sparse::MultiplyWork, MultiplyZeroPositions},
         context::{Context, SemiHonestContext},
         prss::SharedRandomness,
+        step::Gate,
         RecordId,
     },
     secret_sharing::replicated::{
@@ -26,8 +27,8 @@ use crate::{
 /// ## Errors
 /// Lots of things may go wrong here, from timeouts to bad output. They will be signalled
 /// back via the error response
-pub async fn multiply<F>(
-    ctx: SemiHonestContext<'_>,
+pub async fn multiply<F, G>(
+    ctx: SemiHonestContext<'_, G>,
     record_id: RecordId,
     a: &Replicated<F>,
     b: &Replicated<F>,
@@ -35,6 +36,7 @@ pub async fn multiply<F>(
 ) -> Result<Replicated<F>, Error>
 where
     F: Field,
+    G: Gate,
 {
     let role = ctx.role();
     let [need_to_recv, need_to_send, need_random_right] = zeros.work_for(role);

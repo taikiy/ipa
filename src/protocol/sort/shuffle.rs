@@ -5,7 +5,12 @@ use crate::{
     error::Error,
     ff::Field,
     helpers::{Direction, Role},
-    protocol::{basics::Reshare, context::Context, step::Step, NoRecord, RecordId},
+    protocol::{
+        basics::Reshare,
+        context::Context,
+        step::{Gate, Step},
+        NoRecord, RecordId,
+    },
     secret_sharing::SecretSharing,
 };
 
@@ -60,7 +65,7 @@ pub(super) fn shuffle_for_helper(which_step: ShuffleStep) -> Role {
 /// i)   2 helpers receive permutation pair and choose the permutation to be applied
 /// ii)  2 helpers apply the permutation to their shares
 /// iii) reshare to `to_helper`
-async fn shuffle_or_unshuffle_once<F, S, C>(
+async fn shuffle_or_unshuffle_once<F, S, C, G>(
     mut input: Vec<S>,
     random_permutations: (&[u32], &[u32]),
     shuffle_or_unshuffle: ShuffleOrUnshuffle,
@@ -69,9 +74,9 @@ async fn shuffle_or_unshuffle_once<F, S, C>(
 ) -> Result<Vec<S>, Error>
 where
     F: Field,
-    S: SecretSharing<F>,
-    C: Context,
-    S: Reshare<C, RecordId> + Send + Sync,
+    S: SecretSharing<F> + Reshare<C, G, RecordId> + Send + Sync,
+    C: Context<G>,
+    G: Gate,
 {
     let to_helper = shuffle_for_helper(which_step);
     let ctx = ctx.narrow(&which_step);
@@ -99,7 +104,12 @@ where
 /// For this, we have three shuffle steps one per `shuffle_or_unshuffle_once` i.e. Step1, Step2 and Step3.
 /// The Shuffle object receives a step function and appends a `ShuffleStep` to form a concrete step
 /// ![Shuffle steps][shuffle]
-pub async fn shuffle_shares<F: Field, S: SecretSharing<F> + Reshare<C, RecordId>, C: Context>(
+pub async fn shuffle_shares<
+    F: Field,
+    S: SecretSharing<F> + Reshare<C, G, RecordId>,
+    C: Context<G>,
+    G: Gate,
+>(
     input: Vec<S>,
     random_permutations: (&[u32], &[u32]),
     ctx: C,
@@ -134,7 +144,12 @@ pub async fn shuffle_shares<F: Field, S: SecretSharing<F> + Reshare<C, RecordId>
 /// Unshuffle calls `shuffle_or_unshuffle_once` three times with 2 helpers shuffling the shares each time in the opposite order to shuffle.
 /// Order of calling `shuffle_or_unshuffle_once` is shuffle with (H1, H2), (H3, H1) and (H2, H3)
 /// ![Unshuffle steps][unshuffle]
-pub async fn unshuffle_shares<F: Field, S: SecretSharing<F> + Reshare<C, RecordId>, C: Context>(
+pub async fn unshuffle_shares<
+    F: Field,
+    S: SecretSharing<F> + Reshare<C, G, RecordId>,
+    C: Context<G>,
+    G: Gate,
+>(
     input: Vec<S>,
     random_permutations: (&[u32], &[u32]),
     ctx: C,
