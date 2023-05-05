@@ -6,7 +6,12 @@ use crate::{
 };
 use std::iter::repeat;
 
-use super::{basics::ShareKnownValue, context::Context, step::BitOpStep, RecordId};
+use super::{
+    basics::ShareKnownValue,
+    context::Context,
+    step::{BitOpStep, Gate},
+    RecordId,
+};
 
 mod add_constant;
 mod bit_decomposition;
@@ -27,11 +32,12 @@ pub use xor::{xor, xor_sparse};
 
 /// Converts the given number to a sequence of `{0,1} ⊆ F`, and creates a
 /// local replicated share.
-pub fn local_secret_shared_bits<F, C, S>(ctx: &C, x: u128) -> Vec<S>
+pub fn local_secret_shared_bits<F, C, G, S>(ctx: &C, x: u128) -> Vec<S>
 where
     F: PrimeField,
-    C: Context,
-    S: SecretSharing<F> + ShareKnownValue<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: SecretSharing<F> + ShareKnownValue<C, G, F>,
 {
     (0..(u128::BITS - F::PRIME.into().leading_zeros()))
         .map(|i| {
@@ -46,15 +52,16 @@ where
 
 /// We can minimize circuit depth by doing this in a binary-tree like fashion, where pairs of shares are multiplied together
 /// and those results are recursively multiplied.
-pub(crate) async fn multiply_all_shares<F, C, S>(
+pub(crate) async fn multiply_all_shares<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     x: &[S],
 ) -> Result<S, Error>
 where
     F: Field,
-    C: Context,
-    S: SecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    G: Gate,
+    S: SecretSharing<F> + SecureMul<C, G>,
 {
     let mut shares_to_multiply = x.to_vec();
     let mut mult_count = 0_u32;
@@ -93,22 +100,24 @@ where
 
 /// # Errors
 /// This does multiplications which can have errors
-pub(crate) async fn any_ones<F, C, S>(ctx: C, record_id: RecordId, x: &[S]) -> Result<S, Error>
+pub(crate) async fn any_ones<F, C, G, S>(ctx: C, record_id: RecordId, x: &[S]) -> Result<S, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let one = S::share_known_value(&ctx, F::ONE);
     let res = all_zeroes(ctx, record_id, x).await?;
     Ok(one - &res)
 }
 
-pub(crate) async fn all_zeroes<F, C, S>(ctx: C, record_id: RecordId, x: &[S]) -> Result<S, Error>
+pub(crate) async fn all_zeroes<F, C, G, S>(ctx: C, record_id: RecordId, x: &[S]) -> Result<S, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let one = S::share_known_value(&ctx, F::ONE);
     let inverted_elements = flip_bits(one.clone(), x);

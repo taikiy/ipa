@@ -18,6 +18,7 @@ use crate::{
                 malicious_generate_permutation_and_reveal_shuffled,
             },
         },
+        step::Gate,
         BasicProtocols, RecordId,
     },
     secret_sharing::{
@@ -232,11 +233,12 @@ impl<F: Field, T: LinearSecretSharing<F>> IPAModulusConvertedInputRow<F, T> {
 }
 
 #[async_trait]
-impl<F, T, C> Reshare<C, RecordId> for IPAModulusConvertedInputRow<F, T>
+impl<F, T, C, G> Reshare<C, G, RecordId> for IPAModulusConvertedInputRow<F, T>
 where
     F: Field,
-    T: LinearSecretSharing<F> + Reshare<C, RecordId>,
-    C: Context,
+    T: LinearSecretSharing<F> + Reshare<C, G, RecordId>,
+    C: Context<G>,
+    G: Gate,
 {
     async fn reshare<'fut>(
         &self,
@@ -289,12 +291,13 @@ where
 /// Propagates errors from multiplications
 /// # Panics
 /// Propagates errors from multiplications
-pub async fn ipa<F, MK, BK>(
-    ctx: SemiHonestContext<'_>,
+pub async fn ipa<G, F, MK, BK>(
+    ctx: SemiHonestContext<'_, G>,
     input_rows: &[IPAInputRow<F, MK, BK>],
     config: IpaQueryConfig,
 ) -> Result<Vec<MCAggregateCreditOutputRow<F, Replicated<F>, BK>>, Error>
 where
+    G: Gate,
     F: PrimeField,
     MK: GaloisField,
     BK: GaloisField,
@@ -377,17 +380,18 @@ where
 /// # Panics
 /// Propagates errors from multiplications
 #[allow(dead_code, clippy::too_many_lines)]
-pub async fn ipa_malicious<'a, F, MK, BK>(
-    sh_ctx: SemiHonestContext<'a>,
+pub async fn ipa_malicious<'a, G, F, MK, BK>(
+    sh_ctx: SemiHonestContext<'a, G>,
     input_rows: &[IPAInputRow<F, MK, BK>],
     config: IpaQueryConfig,
 ) -> Result<Vec<MCAggregateCreditOutputRow<F, Replicated<F>, BK>>, Error>
 where
+    G: Gate,
     F: PrimeField + ExtendableField,
     MK: GaloisField,
     BK: GaloisField,
-    MaliciousReplicated<F>: Serializable + BasicProtocols<MaliciousContext<'a, F>, F>,
-    Replicated<F>: Serializable + BasicProtocols<SemiHonestContext<'a>, F>,
+    MaliciousReplicated<F>: Serializable + BasicProtocols<MaliciousContext<'a, F, G>, G, F>,
+    Replicated<F>: Serializable + BasicProtocols<SemiHonestContext<'a, G>, G, F>,
 {
     let malicious_validator = MaliciousValidator::<F>::new(sh_ctx.clone());
     let m_ctx = malicious_validator.context();

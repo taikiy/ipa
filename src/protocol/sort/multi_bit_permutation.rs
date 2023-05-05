@@ -1,7 +1,7 @@
 use crate::{
     error::Error,
     ff::Field,
-    protocol::{context::Context, sort::check_everything, BasicProtocols, RecordId},
+    protocol::{context::Context, sort::check_everything, step::Gate, BasicProtocols, RecordId},
     secret_sharing::Linear as LinearSecretSharing,
 };
 use std::iter::repeat;
@@ -27,8 +27,9 @@ use std::iter::repeat;
 pub async fn multi_bit_permutation<
     'a,
     F: Field,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
-    C: Context,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+    C: Context<G>,
+    G: Gate,
 >(
     ctx: C,
     input: &[Vec<S>],

@@ -18,7 +18,11 @@ pub mod metrics;
 
 use crate::{
     ff::Field,
-    protocol::{context::Context, prss::Endpoint as PrssEndpoint, step::Step},
+    protocol::{
+        context::Context,
+        prss::Endpoint as PrssEndpoint,
+        step::{Gate, Step},
+    },
     secret_sharing::{replicated::semi_honest::AdditiveShare as Replicated, IntoShares},
 };
 #[cfg(feature = "in-memory-infra")]
@@ -37,7 +41,7 @@ pub use world::{Runner, TestWorld, TestWorldConfig};
 /// # Panics
 /// Never, but then Rust doesn't know that; this is only needed because we don't have `each_ref()`.
 #[must_use]
-pub fn narrow_contexts<C: Context>(contexts: &[C; 3], step: &impl Step) -> [C; 3] {
+pub fn narrow_contexts<C: Context<G>, G: Gate>(contexts: &[C; 3], step: &impl Step) -> [C; 3] {
     // This really wants <[_; N]>::each_ref()
     contexts
         .iter()

@@ -6,6 +6,7 @@ use crate::{
         attribution::input::MCAggregateCreditOutputRow,
         context::SemiHonestContext,
         ipa::{ipa, IPAInputRow},
+        step::Gate,
         BreakdownKey, MatchKey,
     },
     query::ProtocolResult,
@@ -18,9 +19,9 @@ use typenum::Unsigned;
 pub struct Runner(pub IpaQueryConfig);
 
 impl Runner {
-    pub async fn run(
+    pub async fn run<G: Gate>(
         &self,
-        ctx: SemiHonestContext<'_>,
+        ctx: SemiHonestContext<'_, G>,
         field: FieldType,
         input: ByteArrStream,
     ) -> Box<dyn ProtocolResult> {
@@ -39,9 +40,9 @@ impl Runner {
     }
 
     // This is intentionally made not async because it does not capture `self`.
-    fn run_internal<'a, F: PrimeField, MK: GaloisField, BK: GaloisField>(
+    fn run_internal<'a, G: Gate, F: PrimeField, MK: GaloisField, BK: GaloisField>(
         &self,
-        ctx: SemiHonestContext<'a>,
+        ctx: SemiHonestContext<'a, G>,
         input: ByteArrStream,
     ) -> impl Future<
         Output = std::result::Result<

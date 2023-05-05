@@ -1,7 +1,7 @@
 use crate::{
     error::Error,
     ff::Field,
-    protocol::{basics::SecureMul, context::Context, RecordId},
+    protocol::{basics::SecureMul, context::Context, step::Gate, RecordId},
     secret_sharing::Linear as LinearSecretSharing,
 };
 
@@ -10,7 +10,7 @@ use crate::{
 ///
 /// ## Errors
 /// Fails if the multiplication protocol fails.
-pub async fn or<F: Field, C: Context, S: LinearSecretSharing<F> + SecureMul<C>>(
+pub async fn or<F: Field, C: Context<G>, G: Gate, S: LinearSecretSharing<F> + SecureMul<C, G>>(
     ctx: C,
     record_id: RecordId,
     a: &S,

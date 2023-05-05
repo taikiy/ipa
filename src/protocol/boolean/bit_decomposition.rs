@@ -7,7 +7,7 @@ use super::{
 use crate::{
     error::Error,
     ff::PrimeField,
-    protocol::{context::Context, BasicProtocols, RecordId},
+    protocol::{context::Context, step::Gate, BasicProtocols, RecordId},
     secret_sharing::Linear as LinearSecretSharing,
 };
 
@@ -27,16 +27,17 @@ impl BitDecomposition {
     /// ## Errors
     /// Lots of things may go wrong here, from timeouts to bad output. They will be signalled
     /// back via the error response
-    pub async fn execute<F, S, C>(
+    pub async fn execute<F, S, C, G>(
         ctx: C,
         record_id: RecordId,
-        rbg: &RandomBitsGenerator<F, S, C>,
+        rbg: &RandomBitsGenerator<F, S, C, G>,
         a_p: &S,
     ) -> Result<Vec<S>, Error>
     where
         F: PrimeField,
-        S: LinearSecretSharing<F> + BasicProtocols<C, F>,
-        C: Context + RandomBits<F, Share = S>,
+        S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+        C: Context<G> + RandomBits<F, Share = S>,
+        G: Gate,
     {
         // step 1 in the paper is just describing the input, `[a]_p` where `a ∈ F_p`
 
@@ -102,7 +103,8 @@ mod tests {
     use crate::{
         ff::{Field, Fp31, Fp32BitPrime, PrimeField},
         protocol::{
-            boolean::random_bits_generator::RandomBitsGenerator, context::Context, RecordId,
+            boolean::random_bits_generator::RandomBitsGenerator, context::Context, step::Gate,
+            RecordId,
         },
         test_fixture::{bits_to_value, Reconstruct, Runner, TestWorld},
     };
@@ -118,7 +120,7 @@ mod tests {
         }
     }
 
-    async fn bit_decomposition<F>(world: &TestWorld, a: F) -> Vec<F>
+    async fn bit_decomposition<F, G>(world: &TestWorld, a: F) -> Vec<F>
     where
         F: PrimeField + Sized,
         Standard: Distribution<F>,

@@ -4,7 +4,7 @@ use crate::{
     ff::PrimeField,
     protocol::{
         context::{Context, MaliciousContext},
-        step::BitOpStep,
+        step::{BitOpStep, Gate},
         RecordId,
     },
     secret_sharing::replicated::malicious::{
@@ -15,7 +15,7 @@ use crate::{
 use async_trait::async_trait;
 
 #[async_trait]
-impl<F: PrimeField + ExtendableField> RandomBits<F> for MaliciousContext<'_, F> {
+impl<F: PrimeField + ExtendableField, G: Gate> RandomBits<F> for MaliciousContext<'_, F, G> {
     type Share = MaliciousReplicated<F>;
 
     /// Generates a sequence of `l` random bit sharings in the target field `F`.

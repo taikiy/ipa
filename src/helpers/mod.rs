@@ -38,7 +38,7 @@ use crate::{
         Direction::{Left, Right},
         Role::{H1, H2, H3},
     },
-    protocol::{step, RecordId},
+    protocol::{step::Gate, RecordId},
     secret_sharing::SharedValue,
 };
 use generic_array::GenericArray;
@@ -372,21 +372,21 @@ impl TryFrom<[Role; 3]> for RoleAssignment {
 /// Combination of helper role and step that uniquely identifies a single channel of communication
 /// between two helpers.
 #[derive(Clone, Eq, PartialEq, Hash)]
-pub struct ChannelId {
+pub struct ChannelId<G: Gate> {
     pub role: Role,
     // TODO: step could be either reference or owned value. references are convenient to use inside
     // gateway , owned values can be used inside lookup tables.
-    pub step: step::Descriptive,
+    pub step: G,
 }
 
-impl ChannelId {
+impl<G: Gate> ChannelId<G> {
     #[must_use]
-    pub fn new(role: Role, step: step::Descriptive) -> Self {
+    pub fn new(role: Role, step: G) -> Self {
         Self { role, step }
     }
 }
 
-impl Debug for ChannelId {
+impl<G: Gate> Debug for ChannelId<G> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "channel[{:?},{:?}]", self.role, self.step)
     }

@@ -4,6 +4,7 @@ use crate::{
     protocol::{
         basics::{MultiplyZeroPositions, SecureMul, ZeroPositions},
         context::Context,
+        step::Gate,
         RecordId,
     },
     secret_sharing::Linear as LinearSecretSharing,
@@ -13,11 +14,12 @@ use crate::{
 /// It computes `[a] + [b] - 2[ab]`
 /// # Errors
 /// When communication fails.
-pub async fn xor<F, C, S>(ctx: C, record_id: RecordId, a: &S, b: &S) -> Result<S, Error>
+pub async fn xor<F, C, G, S>(ctx: C, record_id: RecordId, a: &S, b: &S) -> Result<S, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + SecureMul<C, G>,
 {
     xor_sparse(ctx, record_id, a, b, ZeroPositions::NONE).await
 }
@@ -25,7 +27,7 @@ where
 /// Secure XOR protocol with maybe sparse inputs.
 /// # Errors
 /// When communication fails.
-pub async fn xor_sparse<F, C, S>(
+pub async fn xor_sparse<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     a: &S,
@@ -34,8 +36,9 @@ pub async fn xor_sparse<F, C, S>(
 ) -> Result<S, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + SecureMul<C, G>,
 {
     let ab = a.multiply_sparse(b, ctx, record_id, zeros_at).await?;
     Ok(-(ab * F::truncate_from(2_u128)) + a + b)

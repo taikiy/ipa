@@ -5,7 +5,7 @@ mod semi_honest;
 use crate::{
     helpers::{Message, ReceivingEnd, Role, SendingEnd, TotalRecords},
     protocol::{
-        step::{self, Step},
+        step::{Gate, Step},
         RecordId,
     },
     seq_join::SeqJoin,
@@ -17,13 +17,13 @@ pub use semi_honest::SemiHonestContext;
 
 /// Context used by each helper to perform secure computation. Provides access to shared randomness
 /// generator and communication channel.
-pub trait Context: Clone + Send + Sync + SeqJoin {
+pub trait Context<G: Gate>: Clone + Send + Sync + SeqJoin {
     /// The role of this context.
     fn role(&self) -> Role;
 
     /// A unique identifier for this stage of the protocol execution.
     #[must_use]
-    fn step(&self) -> &step::Descriptive;
+    fn step(&self) -> &G;
 
     /// Make a sub-context.
     /// Note that each invocation of this should use a unique value of `step`.
@@ -62,7 +62,7 @@ pub trait Context: Clone + Send + Sync + SeqJoin {
         InstrumentedSequentialSharedRandomness,
     );
 
-    fn send_channel<M: Message>(&self, role: Role) -> SendingEnd<M>;
+    fn send_channel<M: Message>(&self, role: Role) -> SendingEnd<M, G>;
     fn recv_channel<M: Message>(&self, role: Role) -> ReceivingEnd<M>;
 }
 
@@ -127,11 +127,12 @@ mod tests {
     }
 
     /// Toy protocol to execute PRSS generation and send/receive logic
-    async fn toy_protocol<F, S, C>(ctx: C, index: usize, share: &S) -> Replicated<F>
+    async fn toy_protocol<F, S, C, G>(ctx: C, index: usize, share: &S) -> Replicated<F>
     where
         F: Field,
         Standard: Distribution<F>,
-        C: Context,
+        C: Context<G>,
+        G: Gate,
         S: AsReplicatedTestOnly<F>,
     {
         let ctx = ctx.narrow("metrics");
@@ -168,7 +169,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn semi_honest_metrics() {
+    async fn semi_honest_metrics<G: Gate>() {
         let world = TestWorld::new_with(TestWorldConfig::default().enable_metrics());
         let input = (0..10u128).map(Fp31::truncate_from).collect::<Vec<_>>();
         let input_len = input.len();
@@ -193,7 +194,7 @@ mod tests {
 
         let input_size = input.len();
         let snapshot = world.metrics_snapshot();
-        let metrics_step = step::Descriptive::default()
+        let metrics_step = G::default()
             .narrow(&TestWorld::execution_step(0))
             .narrow("metrics");
 
@@ -230,7 +231,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn malicious_metrics() {
+    async fn malicious_metrics<G: Gate>() {
         let world = TestWorld::new_with(TestWorldConfig::default().enable_metrics());
         let input = vec![Fp31::truncate_from(0u128), Fp31::truncate_from(1u128)];
         let input_len = input.len();
@@ -250,7 +251,7 @@ mod tests {
             })
             .await;
 
-        let metrics_step = step::Descriptive::default()
+        let metrics_step = G::default()
             .narrow(&TestWorld::execution_step(0))
             // TODO: leaky abstraction, test world should tell us the exact step
             .narrow(&MaliciousProtocol)

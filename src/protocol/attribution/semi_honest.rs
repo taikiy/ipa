@@ -14,6 +14,7 @@ use crate::{
     protocol::{
         context::{Context, SemiHonestContext},
         ipa::IPAModulusConvertedInputRow,
+        step::Gate,
     },
     secret_sharing::replicated::semi_honest::AdditiveShare,
 };
@@ -23,13 +24,14 @@ use std::iter::{once, zip};
 ///
 /// # Errors
 /// propagates errors from multiplications
-pub async fn secure_attribution<F, BK>(
-    ctx: SemiHonestContext<'_>,
+pub async fn secure_attribution<G, F, BK>(
+    ctx: SemiHonestContext<'_, G>,
     sorted_match_keys: Vec<Vec<AdditiveShare<Gf2>>>,
     sorted_rows: Vec<IPAModulusConvertedInputRow<F, AdditiveShare<F>>>,
     config: IpaQueryConfig,
 ) -> Result<Vec<MCAggregateCreditOutputRow<F, AdditiveShare<F>, BK>>, Error>
 where
+    G: Gate,
     F: PrimeField,
     BK: GaloisField,
     AdditiveShare<F>: Serializable,

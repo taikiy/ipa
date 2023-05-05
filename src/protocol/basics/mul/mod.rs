@@ -3,6 +3,7 @@ use crate::{
     ff::Field,
     protocol::{
         context::{Context, MaliciousContext, SemiHonestContext},
+        step::Gate,
         RecordId,
     },
     secret_sharing::replicated::{
@@ -20,7 +21,7 @@ pub use sparse::{MultiplyZeroPositions, ZeroPositions};
 
 /// Trait to multiply secret shares. That requires communication and `multiply` function is async.
 #[async_trait]
-pub trait SecureMul<C: Context>: Send + Sync + Sized {
+pub trait SecureMul<C: Context<G>, G: Gate>: Send + Sync + Sized {
     /// Multiply and return the result of `a` * `b`.
     async fn multiply<'fut>(&self, rhs: &Self, ctx: C, record_id: RecordId) -> Result<Self, Error>
     where
@@ -51,16 +52,16 @@ use {malicious::multiply as malicious_mul, semi_honest::multiply as semi_honest_
 
 /// Implement secure multiplication for semi-honest contexts with replicated secret sharing.
 #[async_trait]
-impl<'a, F: Field> SecureMul<SemiHonestContext<'a>> for Replicated<F> {
+impl<'a, F: Field, G: Gate> SecureMul<SemiHonestContext<'a, G>, G> for Replicated<F> {
     async fn multiply_sparse<'fut>(
         &self,
         rhs: &Self,
-        ctx: SemiHonestContext<'a>,
+        ctx: SemiHonestContext<'a, G>,
         record_id: RecordId,
         zeros_at: MultiplyZeroPositions,
     ) -> Result<Self, Error>
     where
-        SemiHonestContext<'a>: 'fut,
+        SemiHonestContext<'a, G>: 'fut,
     {
         semi_honest_mul(ctx, record_id, self, rhs, zeros_at).await
     }
@@ -68,16 +69,18 @@ impl<'a, F: Field> SecureMul<SemiHonestContext<'a>> for Replicated<F> {
 
 /// Implement secure multiplication for malicious contexts with replicated secret sharing.
 #[async_trait]
-impl<'a, F: Field + ExtendableField> SecureMul<MaliciousContext<'a, F>> for MaliciousReplicated<F> {
+impl<'a, F: Field + ExtendableField, G: Gate> SecureMul<MaliciousContext<'a, F, G>, G>
+    for MaliciousReplicated<F>
+{
     async fn multiply_sparse<'fut>(
         &self,
         rhs: &Self,
-        ctx: MaliciousContext<'a, F>,
+        ctx: MaliciousContext<'a, F, G>,
         record_id: RecordId,
         zeros_at: MultiplyZeroPositions,
     ) -> Result<Self, Error>
     where
-        MaliciousContext<'a, F>: 'fut,
+        MaliciousContext<'a, F, G>: 'fut,
     {
         malicious_mul(ctx, record_id, self, rhs, zeros_at).await
     }

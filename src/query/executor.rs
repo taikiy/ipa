@@ -8,7 +8,7 @@ use crate::{
     protocol::{
         attribution::input::MCAggregateCreditOutputRow,
         context::SemiHonestContext,
-        step::{self, StepNarrow},
+        step::{self, StepNarrow, Gate},
     },
     query::runner::IpaRunner,
     secret_sharing::{replicated::semi_honest::AdditiveShare, Linear as LinearSecretSharing},
@@ -62,9 +62,9 @@ where
 }
 
 #[allow(unused)]
-pub fn start_query(
+pub fn start_query<G: Gate>(
     config: QueryConfig,
-    gateway: Gateway,
+    gateway: Gateway<G>,
     input: ByteArrStream,
 ) -> JoinHandle<Box<dyn Result>> {
     tokio::spawn(async move {

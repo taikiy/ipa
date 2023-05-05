@@ -1,6 +1,6 @@
 use crate::{
     helpers::{buffers::UnorderedReceiver, ChannelId, Error, Message, Transport},
-    protocol::RecordId,
+    protocol::{step::Gate, RecordId},
 };
 use dashmap::DashMap;
 use futures::Stream;
@@ -13,8 +13,8 @@ pub struct ReceivingEnd<T: Transport, M: Message> {
 }
 
 /// Receiving channels, indexed by (role, step).
-pub(super) struct GatewayReceivers<T: Transport> {
-    inner: DashMap<ChannelId, UR<T>>,
+pub(super) struct GatewayReceivers<T: Transport, G: Gate> {
+    inner: DashMap<ChannelId<G>, UR<T>>,
 }
 
 pub(super) type UR<T> = UnorderedReceiver<
@@ -46,7 +46,7 @@ impl<T: Transport, M: Message> ReceivingEnd<T, M> {
     }
 }
 
-impl<T: Transport> Default for GatewayReceivers<T> {
+impl<T: Transport, G: Gate> Default for GatewayReceivers<T, G> {
     fn default() -> Self {
         Self {
             inner: DashMap::default(),
@@ -54,8 +54,8 @@ impl<T: Transport> Default for GatewayReceivers<T> {
     }
 }
 
-impl<T: Transport> GatewayReceivers<T> {
-    pub fn get_or_create<F: FnOnce() -> UR<T>>(&self, channel_id: &ChannelId, ctr: F) -> UR<T> {
+impl<T: Transport, G: Gate> GatewayReceivers<T, G> {
+    pub fn get_or_create<F: FnOnce() -> UR<T>>(&self, channel_id: &ChannelId<G>, ctr: F) -> UR<T> {
         let receivers = &self.inner;
         if let Some(recv) = receivers.get(channel_id) {
             recv.clone()

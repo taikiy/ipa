@@ -1,7 +1,10 @@
 use crate::{
     ff::Field,
     helpers::Role,
-    protocol::context::{Context, MaliciousContext, SemiHonestContext},
+    protocol::{
+        context::{Context, MaliciousContext, SemiHonestContext},
+        step::Gate,
+    },
     secret_sharing::{
         replicated::{
             malicious::{AdditiveShare as MaliciousReplicated, ExtendableField},
@@ -12,12 +15,12 @@ use crate::{
     },
 };
 
-pub trait ShareKnownValue<C: Context, V: SharedValue> {
+pub trait ShareKnownValue<C: Context<G>, G: Gate, V: SharedValue> {
     fn share_known_value(ctx: &C, value: V) -> Self;
 }
 
-impl<'a, F: Field> ShareKnownValue<SemiHonestContext<'a>, F> for Replicated<F> {
-    fn share_known_value(ctx: &SemiHonestContext<'a>, value: F) -> Self {
+impl<'a, F: Field, G: Gate> ShareKnownValue<SemiHonestContext<'a, G>, G, F> for Replicated<F> {
+    fn share_known_value(ctx: &SemiHonestContext<'a, G>, value: F) -> Self {
         match ctx.role() {
             Role::H1 => Self::new(value, F::ZERO),
             Role::H2 => Self::new(F::ZERO, F::ZERO),
@@ -26,10 +29,10 @@ impl<'a, F: Field> ShareKnownValue<SemiHonestContext<'a>, F> for Replicated<F> {
     }
 }
 
-impl<'a, F: Field + ExtendableField> ShareKnownValue<MaliciousContext<'a, F>, F>
+impl<'a, F: Field + ExtendableField, G: Gate> ShareKnownValue<MaliciousContext<'a, F, G>, G, F>
     for MaliciousReplicated<F>
 {
-    fn share_known_value(ctx: &MaliciousContext<'a, F>, value: F) -> Self {
+    fn share_known_value(ctx: &MaliciousContext<'a, F, G>, value: F) -> Self {
         ctx.share_known_value(value)
     }
 }

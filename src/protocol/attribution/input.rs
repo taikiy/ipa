@@ -2,7 +2,12 @@ use crate::{
     error::Error,
     ff::{Field, GaloisField, Serializable},
     helpers::Role,
-    protocol::{basics::Reshare, context::Context, step::Step, RecordId},
+    protocol::{
+        basics::Reshare,
+        context::Context,
+        step::{Gate, Step},
+        RecordId,
+    },
     secret_sharing::{
         replicated::{
             malicious::{
@@ -303,11 +308,12 @@ where
 }
 
 #[async_trait]
-impl<F, T, C> Reshare<C, RecordId> for MCAccumulateCreditInputRow<F, T>
+impl<F, T, C, G> Reshare<C, G, RecordId> for MCAccumulateCreditInputRow<F, T>
 where
     F: Field,
-    T: LinearSecretSharing<F> + Reshare<C, RecordId>,
-    C: Context,
+    T: LinearSecretSharing<F> + Reshare<C, G, RecordId>,
+    C: Context<G>,
+    G: Gate,
 {
     async fn reshare<'fut>(
         &self,
@@ -361,11 +367,12 @@ where
 }
 
 #[async_trait]
-impl<F, T, C> Reshare<C, RecordId> for MCCappedCreditsWithAggregationBit<F, T>
+impl<F, T, C, G> Reshare<C, G, RecordId> for MCCappedCreditsWithAggregationBit<F, T>
 where
     F: Field,
-    T: LinearSecretSharing<F> + Reshare<C, RecordId>,
-    C: Context,
+    T: LinearSecretSharing<F> + Reshare<C, G, RecordId>,
+    C: Context<G>,
+    G: Gate,
 {
     async fn reshare<'fut>(
         &self,

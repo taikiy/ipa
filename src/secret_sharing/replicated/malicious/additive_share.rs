@@ -6,6 +6,7 @@ use crate::{
         sort::{
             generate_permutation::ShuffledPermutationWrapper, ShuffleRevealStep::RevealPermutation,
         },
+        step::Gate,
         NoRecord,
     },
     secret_sharing::{
@@ -268,8 +269,8 @@ where
 }
 
 #[async_trait]
-impl<'a, F: Field + ExtendableField> Downgrade
-    for ShuffledPermutationWrapper<AdditiveShare<F>, MaliciousContext<'a, F>>
+impl<'a, F: Field + ExtendableField, G: Gate> Downgrade
+    for ShuffledPermutationWrapper<AdditiveShare<F>, MaliciousContext<'a, F, G>, G>
 {
     type Target = Vec<u32>;
     /// For ShuffledPermutationWrapper on downgrading, we return revealed permutation. This runs reveal on the malicious context

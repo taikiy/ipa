@@ -8,6 +8,7 @@ use crate::{
     protocol::{
         boolean::{greater_than_constant, random_bits_generator::RandomBitsGenerator, RandomBits},
         context::Context,
+        step::Gate,
         BasicProtocols, RecordId,
     },
     secret_sharing::Linear as LinearSecretSharing,
@@ -20,7 +21,7 @@ use std::iter::{repeat, zip};
 ///
 /// # Errors
 /// Fails if sub-protocols fails.
-pub async fn apply_attribution_window<F, C, T>(
+pub async fn apply_attribution_window<F, C, G, T>(
     ctx: C,
     input: &[MCApplyAttributionWindowInputRow<F, T>],
     stop_bits: &[T],
@@ -28,8 +29,9 @@ pub async fn apply_attribution_window<F, C, T>(
 ) -> Result<Vec<MCApplyAttributionWindowOutputRow<F, T>>, Error>
 where
     F: PrimeField,
-    C: Context + RandomBits<F, Share = T>,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G> + RandomBits<F, Share = T>,
+    G: Gate,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     // if `attribution_window_seconds` is 0, skip the entire protocol
     if attribution_window_seconds == 0 {
@@ -72,15 +74,16 @@ where
 ///
 /// # Errors
 /// Fails if the multiplication fails.
-async fn prefix_sum_time_deltas<F, C, T>(
+async fn prefix_sum_time_deltas<F, C, G, T>(
     ctx: &C,
     input: &[MCApplyAttributionWindowInputRow<F, T>],
     stop_bits: &[T],
 ) -> Result<Vec<T>, Error>
 where
     F: Field,
-    C: Context,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let num_rows = input.len();
 
@@ -130,7 +133,7 @@ where
 ///
 /// # Errors
 /// Fails if the bit-decomposition, bitwise comparison, or multiplication fails.
-async fn zero_out_expired_trigger_values<F, C, T>(
+async fn zero_out_expired_trigger_values<F, C, G, T>(
     ctx: &C,
     input: &[MCApplyAttributionWindowInputRow<F, T>],
     time_delta: &mut [T],
@@ -138,8 +141,9 @@ async fn zero_out_expired_trigger_values<F, C, T>(
 ) -> Result<Vec<(T, T)>, Error>
 where
     F: PrimeField,
-    C: Context + RandomBits<F, Share = T>,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G> + RandomBits<F, Share = T>,
+    G: Gate,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let ctx = ctx.set_total_records(input.len());
     let random_bits_generator =

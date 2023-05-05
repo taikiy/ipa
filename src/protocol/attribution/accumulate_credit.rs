@@ -5,7 +5,7 @@ use super::{
 use crate::{
     error::Error,
     ff::Field,
-    protocol::{context::Context, BasicProtocols, RecordId},
+    protocol::{context::Context, step::Gate, BasicProtocols, RecordId},
     secret_sharing::Linear as LinearSecretSharing,
 };
 
@@ -22,7 +22,7 @@ use crate::{
 ///
 /// This method implements "last touch" attribution, so only the last `source report` before a `trigger report`
 /// will receive any credit.
-async fn accumulate_credit_cap_one<'a, F, C, T>(
+async fn accumulate_credit_cap_one<'a, F, C, G, T>(
     ctx: C,
     input: &'a [MCAccumulateCreditInputRow<F, T>],
     stop_bits: &'a [T],
@@ -30,8 +30,9 @@ async fn accumulate_credit_cap_one<'a, F, C, T>(
 ) -> Result<impl Iterator<Item = MCAccumulateCreditOutputRow<F, T>> + 'a, Error>
 where
     F: Field,
-    C: Context,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     // if `attribution_window_seconds` is 0, we use `stop_bits` directly. Otherwise, we need to invalidate
     // reports that are outside the attribution window by multiplying them by `active_bit`. active_bit is
@@ -83,7 +84,7 @@ where
 /// # Errors
 ///
 /// Fails if the multiplication fails.
-pub async fn accumulate_credit<F, C, T>(
+pub async fn accumulate_credit<F, C, G, T>(
     ctx: C,
     input: &[MCAccumulateCreditInputRow<F, T>],
     stop_bits: &[T],
@@ -92,8 +93,9 @@ pub async fn accumulate_credit<F, C, T>(
 ) -> Result<Vec<MCAccumulateCreditOutputRow<F, T>>, Error>
 where
     F: Field,
-    C: Context,
-    T: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    T: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     if per_user_credit_cap == 1 {
         return Ok(

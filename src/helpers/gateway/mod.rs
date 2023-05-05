@@ -13,7 +13,7 @@ use crate::{
         },
         ChannelId, Message, Role, RoleAssignment, TotalRecords, Transport,
     },
-    protocol::QueryId,
+    protocol::{step::Gate, QueryId},
 };
 #[cfg(all(feature = "shuttle", test))]
 use shuttle::future as tokio;
@@ -37,11 +37,11 @@ pub type ReceivingEnd<M> = ReceivingEndBase<TransportImpl, M>;
 /// used to avoid carrying `T` over.
 ///
 /// [`Gateway`]: crate::helpers::Gateway
-pub struct Gateway<T: Transport = TransportImpl> {
+pub struct Gateway<G: Gate, T: Transport = TransportImpl> {
     config: GatewayConfig,
     transport: RoleResolvingTransport<T>,
-    senders: GatewaySenders,
-    receivers: GatewayReceivers<T>,
+    senders: GatewaySenders<G>,
+    receivers: GatewayReceivers<T, G>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -51,7 +51,7 @@ pub struct GatewayConfig {
     active: NonZeroUsize,
 }
 
-impl<T: Transport> Gateway<T> {
+impl<G: Gate, T: Transport> Gateway<G, T> {
     #[must_use]
     pub fn new(
         query_id: QueryId,
@@ -85,9 +85,9 @@ impl<T: Transport> Gateway<T> {
     #[must_use]
     pub fn get_sender<M: Message>(
         &self,
-        channel_id: &ChannelId,
+        channel_id: &ChannelId<G>,
         total_records: TotalRecords,
-    ) -> SendingEnd<M> {
+    ) -> SendingEnd<M, G> {
         let (tx, maybe_stream) =
             self.senders
                 .get_or_create::<M>(channel_id, self.config.active_work(), total_records);
@@ -109,7 +109,7 @@ impl<T: Transport> Gateway<T> {
     }
 
     #[must_use]
-    pub fn get_receiver<M: Message>(&self, channel_id: &ChannelId) -> ReceivingEndBase<T, M> {
+    pub fn get_receiver<M: Message>(&self, channel_id: &ChannelId<G>) -> ReceivingEndBase<T, M> {
         ReceivingEndBase::new(
             self.receivers
                 .get_or_create(channel_id, || self.transport.receive(channel_id)),
@@ -160,7 +160,7 @@ mod tests {
     /// Gateway must be able to deal with it.
     #[tokio::test]
     async fn can_handle_heterogeneous_channels() {
-        async fn send<F: Field>(channel: &SendingEnd<F>, i: usize) {
+        async fn send<F: Field, G: Gate>(channel: &SendingEnd<F, G>, i: usize) {
             channel
                 .send(i.into(), F::truncate_from(u128::try_from(i).unwrap()))
                 .await

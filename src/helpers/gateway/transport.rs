@@ -4,7 +4,7 @@ use crate::{
         gateway::{receive::UR, send::GatewaySendStream},
         ChannelId, GatewayConfig, Role, RoleAssignment, RouteId, Transport,
     },
-    protocol::QueryId,
+    protocol::{step::Gate, QueryId},
 };
 
 /// Transport adapter that resolves [`Role`] -> [`HelperIdentity`] mapping. As gateways created
@@ -20,10 +20,10 @@ pub(super) struct RoleResolvingTransport<T> {
 }
 
 impl<T: Transport> RoleResolvingTransport<T> {
-    pub(crate) async fn send(
+    pub(crate) async fn send<G: Gate>(
         &self,
-        channel_id: &ChannelId,
-        data: GatewaySendStream,
+        channel_id: &ChannelId<G>,
+        data: GatewaySendStream<G>,
     ) -> Result<(), T::Error> {
         let dest_identity = self.roles.identity(channel_id.role);
         assert_ne!(
@@ -41,7 +41,7 @@ impl<T: Transport> RoleResolvingTransport<T> {
             .await
     }
 
-    pub(crate) fn receive(&self, channel_id: &ChannelId) -> UR<T> {
+    pub(crate) fn receive<G: Gate>(&self, channel_id: &ChannelId<G>) -> UR<T> {
         let peer = self.roles.identity(channel_id.role);
         assert_ne!(
             peer,

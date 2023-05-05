@@ -5,6 +5,7 @@ use crate::{
     protocol::{
         context::{Context, MaliciousContext},
         prss::SharedRandomness,
+        step::Gate,
         RecordId,
     },
     secret_sharing::replicated::{
@@ -64,14 +65,15 @@ impl AsRef<str> for Step {
 /// back via the error response
 /// ## Panics
 /// Panics if the mutex is found to be poisoned
-pub async fn sum_of_products<F>(
-    ctx: MaliciousContext<'_, F>,
+pub async fn sum_of_products<F, G>(
+    ctx: MaliciousContext<'_, F, G>,
     record_id: RecordId,
     a: &[MaliciousReplicated<F>],
     b: &[MaliciousReplicated<F>],
 ) -> Result<MaliciousReplicated<F>, Error>
 where
     F: Field + ExtendableField,
+    G: Gate,
 {
     use crate::{
         protocol::context::SpecialAccessToMaliciousContext,

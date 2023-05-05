@@ -6,7 +6,11 @@ use crate::{
     error::Error,
     ff::PrimeField,
     helpers::TotalRecords,
-    protocol::{context::Context, step::Step, BasicProtocols, RecordId},
+    protocol::{
+        context::Context,
+        step::{Gate, Step},
+        BasicProtocols, RecordId,
+    },
     secret_sharing::Linear as LinearSecretSharing,
 };
 use std::{
@@ -21,11 +25,11 @@ use std::{
 /// This object is safe to share with multiple threads.  It uses an atomic counter
 /// to manage concurrent accesses.
 #[derive(Debug)]
-pub struct RandomBitsGenerator<F, S, C> {
+pub struct RandomBitsGenerator<F, S, C, G> {
     ctx: C,
     fallback_ctx: C,
     fallback_count: AtomicU32,
-    _marker: PhantomData<(F, S)>,
+    _marker: PhantomData<(F, S, G)>,
 }
 
 /// Special context that is used when values generated using the standard method are larger
@@ -41,11 +45,12 @@ impl AsRef<str> for FallbackStep {
 
 impl Step for FallbackStep {}
 
-impl<F, S, C> RandomBitsGenerator<F, S, C>
+impl<F, S, C, G> RandomBitsGenerator<F, S, C, G>
 where
-    C: Context + RandomBits<F, Share = S>,
+    C: Context<G> + RandomBits<F, Share = S>,
+    G: Gate,
     F: PrimeField,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     #[must_use]
     pub fn new(ctx: C) -> Self {

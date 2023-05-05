@@ -5,6 +5,7 @@ use crate::{
     protocol::{
         basics::SecureMul,
         context::{Context, SemiHonestContext},
+        step::Gate,
         RecordId,
     },
     query::ProtocolResult,
@@ -16,9 +17,9 @@ use typenum::Unsigned;
 pub struct Runner;
 
 impl Runner {
-    pub async fn run(
+    pub async fn run<G: Gate>(
         &self,
-        ctx: SemiHonestContext<'_>,
+        ctx: SemiHonestContext<'_, G>,
         field: FieldType,
         input: ByteArrStream,
     ) -> Box<dyn ProtocolResult> {
@@ -30,9 +31,9 @@ impl Runner {
         }
     }
 
-    async fn run_internal<F: Field>(
+    async fn run_internal<F: Field, G: Gate>(
         &self,
-        ctx: SemiHonestContext<'_>,
+        ctx: SemiHonestContext<'_, G>,
         input: ByteArrStream,
     ) -> std::result::Result<Vec<Replicated<F>>, Error>
     where

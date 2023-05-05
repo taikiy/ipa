@@ -1,9 +1,14 @@
-use std::fmt::{Debug, Display, Formatter};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    hash::Hash,
+};
 
 pub trait StepNarrow<S: Step + ?Sized> {
     #[must_use]
     fn narrow(&self, step: &S) -> Self;
 }
+
+pub trait Gate: Default + Send + Sync + Clone + PartialEq + Eq + Hash + Debug {}
 
 /// Defines a unique step of the IPA protocol at a given level of implementation.
 ///
@@ -55,6 +60,8 @@ impl Step for str {}
 pub struct Descriptive {
     id: String,
 }
+
+impl Gate for Descriptive {}
 
 impl Display for Descriptive {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

@@ -4,6 +4,7 @@ use crate::{
     protocol::{
         basics::{MultiplyZeroPositions, SecureMul, ZeroPositions},
         context::{Context, MaliciousContext},
+        step::Gate,
         RecordId,
     },
     secret_sharing::replicated::{
@@ -63,8 +64,8 @@ impl AsRef<str> for Step {
 /// back via the error response
 /// ## Panics
 /// Panics if the mutex is found to be poisoned
-pub async fn multiply<F>(
-    ctx: MaliciousContext<'_, F>,
+pub async fn multiply<F, G>(
+    ctx: MaliciousContext<'_, F, G>,
     record_id: RecordId,
     a: &MaliciousReplicated<F>,
     b: &MaliciousReplicated<F>,
@@ -72,6 +73,7 @@ pub async fn multiply<F>(
 ) -> Result<MaliciousReplicated<F>, Error>
 where
     F: Field + ExtendableField,
+    G: Gate,
 {
     use crate::{
         protocol::context::SpecialAccessToMaliciousContext,

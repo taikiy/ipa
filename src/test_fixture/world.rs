@@ -8,7 +8,7 @@ use crate::{
         },
         malicious::MaliciousValidator,
         prss::Endpoint as PrssEndpoint,
-        step::Step,
+        step::{Descriptive, Gate, Step},
         QueryId,
     },
     rand::thread_rng,
@@ -34,8 +34,8 @@ use tracing::{Instrument, Level};
 /// For now the messages sent through it never leave the test infra memory perimeter, so
 /// there is no need to associate each of them with `QueryId`, but this API makes it possible
 /// to do if we need it.
-pub struct TestWorld {
-    gateways: [Gateway; 3],
+pub struct TestWorld<G: Gate = Descriptive> {
+    gateways: [Gateway<G>; 3],
     participants: [PrssEndpoint; 3],
     executions: AtomicUsize,
     metrics_handle: MetricsHandle,
@@ -89,7 +89,7 @@ impl Default for TestWorld {
     }
 }
 
-impl TestWorld {
+impl<G: Gate> TestWorld<G> {
     /// Creates a new `TestWorld` instance using the provided `config`.
     /// # Panics
     /// Never.
@@ -133,7 +133,7 @@ impl TestWorld {
     /// # Panics
     /// Panics if world has more or less than 3 gateways/participants
     #[must_use]
-    pub fn contexts(&self) -> [SemiHonestContext<'_>; 3] {
+    pub fn contexts(&self) -> [SemiHonestContext<'_, G>; 3] {
         let execution = self.executions.fetch_add(1, Ordering::Release);
         zip(&self.participants, &self.gateways)
             .map(|(participant, gateway)| {
@@ -155,7 +155,7 @@ impl TestWorld {
         format!("run-{execution}")
     }
 
-    pub fn gateway(&self, role: Role) -> &Gateway {
+    pub fn gateway(&self, role: Role) -> &Gateway<G> {
         &self.gateways[role]
     }
 }
@@ -171,25 +171,27 @@ impl Drop for TestWorld {
 
 #[async_trait]
 pub trait Runner {
-    async fn semi_honest<'a, I, A, O, H, R>(&'a self, input: I, helper_fn: H) -> [O; 3]
+    async fn semi_honest<'a, I, A, O, H, R, G>(&'a self, input: I, helper_fn: H) -> [O; 3]
     where
         I: IntoShares<A> + Send + 'static,
         A: Send,
         O: Send + Debug,
-        H: Fn(SemiHonestContext<'a>, A) -> R + Send + Sync,
-        R: Future<Output = O> + Send;
+        H: Fn(SemiHonestContext<'a, G>, A) -> R + Send + Sync,
+        R: Future<Output = O> + Send,
+        G: Gate;
 
-    async fn malicious<'a, F, I, A, O, M, H, R, P>(&'a self, input: I, helper_fn: H) -> [O; 3]
+    async fn malicious<'a, F, I, A, O, M, H, R, P, G>(&'a self, input: I, helper_fn: H) -> [O; 3]
     where
         F: Field + ExtendableField,
         I: IntoShares<A> + Send + 'static,
         A: Send,
-        for<'u> UpgradeContext<'u, F>: UpgradeToMalicious<A, M>,
+        for<'u> UpgradeContext<'u, F, G>: UpgradeToMalicious<A, M>,
         O: Send + Debug,
         M: Send,
-        H: Fn(MaliciousContext<'a, F>, M) -> R + Send + Sync,
+        H: Fn(MaliciousContext<'a, F, G>, M) -> R + Send + Sync,
         R: Future<Output = P> + Send,
         P: DowngradeMalicious<Target = O> + Clone + Send + Debug,
+        G: Gate,
         [P; 3]: ValidateMalicious<F>,
         Standard: Distribution<F>;
 }
@@ -202,13 +204,13 @@ fn split_array_of_tuples<T, U, V>(v: [(T, U, V); 3]) -> ([T; 3], [U; 3], [V; 3])
 }
 
 #[async_trait]
-impl Runner for TestWorld {
+impl<G: Gate> Runner for TestWorld<G> {
     async fn semi_honest<'a, I, A, O, H, R>(&'a self, input: I, helper_fn: H) -> [O; 3]
     where
         I: IntoShares<A> + Send + 'static,
         A: Send,
         O: Send + Debug,
-        H: Fn(SemiHonestContext<'a>, A) -> R + Send + Sync,
+        H: Fn(SemiHonestContext<'a, G>, A) -> R + Send + Sync,
         R: Future<Output = O> + Send,
     {
         let contexts = self.contexts();
@@ -226,10 +228,10 @@ impl Runner for TestWorld {
         F: Field + ExtendableField,
         I: IntoShares<A> + Send + 'static,
         A: Send,
-        for<'u> UpgradeContext<'u, F>: UpgradeToMalicious<A, M>,
+        for<'u> UpgradeContext<'u, F, G>: UpgradeToMalicious<A, M>,
         O: Send + Debug,
         M: Send,
-        H: Fn(MaliciousContext<'a, F>, M) -> R + Send + Sync,
+        H: Fn(MaliciousContext<'a, F, G>, M) -> R + Send + Sync,
         R: Future<Output = P> + Send,
         P: DowngradeMalicious<Target = O> + Clone + Send + Debug,
         [P; 3]: ValidateMalicious<F>,

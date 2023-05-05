@@ -11,20 +11,22 @@ use crate::{
             apply::apply_inv, generate_permutation::RevealedAndRandomPermutations,
             ApplyInvStep::ShuffleInputs,
         },
+        step::Gate,
         RecordId,
     },
 };
 
 /// # Errors
 /// Propagates errors from shuffle/reshare
-pub async fn apply_sort_permutation<C, I>(
+pub async fn apply_sort_permutation<C, G, I>(
     ctx: C,
     input: Vec<I>,
     sort_permutation: &RevealedAndRandomPermutations,
 ) -> Result<Vec<I>, Error>
 where
-    C: Context,
-    I: Reshare<C, RecordId> + Send + Sync,
+    C: Context<G>,
+    G: Gate,
+    I: Reshare<C, G, RecordId> + Send + Sync,
 {
     let mut shuffled_objects = shuffle_shares(
         input,

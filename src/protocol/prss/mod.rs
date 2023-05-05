@@ -8,8 +8,8 @@ pub use crypto::{Generator, GeneratorFactory, KeyExchange, SharedRandomness};
 #[cfg(feature = "no-prss")]
 pub use no_op::{Generator, GeneratorFactory, KeyExchange, SharedRandomness};
 
-use super::step;
 use crate::{
+    protocol::step,
     rand::{CryptoRng, RngCore},
     sync::{Arc, Mutex},
 };

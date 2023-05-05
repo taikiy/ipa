@@ -3,7 +3,10 @@ use crate::{
     error::Error,
     ff::PrimeField,
     protocol::{
-        boolean::multiply_all_shares, context::Context, step::BitOpStep, BasicProtocols, RecordId,
+        boolean::multiply_all_shares,
+        context::Context,
+        step::{BitOpStep, Gate},
+        BasicProtocols, RecordId,
     },
     secret_sharing::Linear as LinearSecretSharing,
 };
@@ -24,26 +27,32 @@ use std::cmp::Ordering;
 pub struct BitwiseLessThanPrime {}
 
 impl BitwiseLessThanPrime {
-    pub async fn less_than_prime<F, C, S>(ctx: C, record_id: RecordId, x: &[S]) -> Result<S, Error>
-    where
-        F: PrimeField,
-        C: Context,
-        S: LinearSecretSharing<F> + BasicProtocols<C, F>,
-    {
-        let one = S::share_known_value(&ctx, F::ONE);
-        let gtoe = Self::greater_than_or_equal_to_prime(ctx, record_id, x).await?;
-        Ok(one - &gtoe)
-    }
-
-    pub async fn greater_than_or_equal_to_prime<F, C, S>(
+    pub async fn less_than_prime<F, C, G, S>(
         ctx: C,
         record_id: RecordId,
         x: &[S],
     ) -> Result<S, Error>
     where
         F: PrimeField,
-        C: Context,
-        S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+        C: Context<G>,
+        G: Gate,
+        S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+    {
+        let one = S::share_known_value(&ctx, F::ONE);
+        let gtoe = Self::greater_than_or_equal_to_prime(ctx, record_id, x).await?;
+        Ok(one - &gtoe)
+    }
+
+    pub async fn greater_than_or_equal_to_prime<F, C, G, S>(
+        ctx: C,
+        record_id: RecordId,
+        x: &[S],
+    ) -> Result<S, Error>
+    where
+        F: PrimeField,
+        C: Context<G>,
+        G: Gate,
+        S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
     {
         let prime = F::PRIME.into();
         let l = u128::BITS - prime.leading_zeros();
@@ -85,15 +94,16 @@ impl BitwiseLessThanPrime {
         }
     }
 
-    async fn greater_than_or_equal_to_prime_trimmed<F, C, S>(
+    async fn greater_than_or_equal_to_prime_trimmed<F, C, G, S>(
         ctx: C,
         record_id: RecordId,
         x: &[S],
     ) -> Result<S, Error>
     where
         F: PrimeField,
-        C: Context,
-        S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+        C: Context<G>,
+        G: Gate,
+        S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
     {
         let prime = F::PRIME.into();
         let l = u128::BITS - prime.leading_zeros();
@@ -142,15 +152,16 @@ impl BitwiseLessThanPrime {
     /// 1.) Four of them look like [X X 1] (values of X are irrelevant)
     /// 2.) The final one is exactly [1 1 0]
     /// We can check if either of these conditions is true with just 3 multiplications
-    pub async fn check_least_significant_bits<F, C, S>(
+    pub async fn check_least_significant_bits<F, C, G, S>(
         ctx: C,
         record_id: RecordId,
         x: &[S],
     ) -> Result<S, Error>
     where
         F: PrimeField,
-        C: Context,
-        S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+        C: Context<G>,
+        G: Gate,
+        S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
     {
         let prime = F::PRIME.into();
         debug_assert!(prime & 0b111 == 0b011);

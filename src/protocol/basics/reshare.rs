@@ -9,6 +9,7 @@ use crate::{
             apply_sort::shuffle::InnerVectorElementStep,
             ReshareStep::{RandomnessForValidation, ReshareRx},
         },
+        step::Gate,
         NoRecord, RecordBinding, RecordId,
     },
     secret_sharing::replicated::{
@@ -37,7 +38,7 @@ use std::iter::{repeat, zip};
 ///    `to_helper`       = (`rand_left`, `rand_right`)     = (r0, r1)
 ///    `to_helper.right` = (`rand_right`, part1 + part2) = (r0, part1 + part2)
 #[async_trait]
-pub trait Reshare<C: Context, B: RecordBinding>: Sized {
+pub trait Reshare<C: Context<G>, G: Gate, B: RecordBinding>: Sized {
     async fn reshare<'fut>(
         &self,
         ctx: C,
@@ -53,7 +54,7 @@ pub trait Reshare<C: Context, B: RecordBinding>: Sized {
 // would need to specify an associated type bound `T: Reshare<Output = T>` to use this more general
 // version.
 #[async_trait]
-pub trait ReshareBorrowed<C: Context, B: RecordBinding> {
+pub trait ReshareBorrowed<C: Context<G>, G: Gate, B: RecordBinding> {
     type Output: Sized;
     async fn reshare_borrowed<'fut>(
         &self,
@@ -70,15 +71,15 @@ pub trait ReshareBorrowed<C: Context, B: RecordBinding> {
 /// This implements semi-honest reshare algorithm of "Efficient Secure Three-Party Sorting Protocol with an Honest Majority" at communication cost of 2R.
 /// Input: Pi-1 and Pi+1 know their secret shares
 /// Output: At the end of the protocol, all 3 helpers receive their shares of a new, random secret sharing of the secret value
-impl<'a, F: Field> Reshare<SemiHonestContext<'a>, RecordId> for Replicated<F> {
+impl<'a, F: Field, G: Gate> Reshare<SemiHonestContext<'a, G>, G, RecordId> for Replicated<F> {
     async fn reshare<'fut>(
         &self,
-        ctx: SemiHonestContext<'a>,
+        ctx: SemiHonestContext<'a, G>,
         record_id: RecordId,
         to_helper: Role,
     ) -> Result<Self, Error>
     where
-        SemiHonestContext<'a>: 'fut,
+        SemiHonestContext<'a, G>: 'fut,
     {
         let r = ctx.prss().generate_fields(record_id);
 
@@ -122,17 +123,17 @@ impl<'a, F: Field> Reshare<SemiHonestContext<'a>, RecordId> for Replicated<F> {
 /// For malicious reshare, we run semi honest reshare protocol twice, once for x and another for rx and return the results
 /// # Errors
 /// If either of reshares fails
-impl<'a, F: Field + ExtendableField> Reshare<MaliciousContext<'a, F>, RecordId>
+impl<'a, F: Field + ExtendableField, G: Gate> Reshare<MaliciousContext<'a, F, G>, G, RecordId>
     for MaliciousReplicated<F>
 {
     async fn reshare<'fut>(
         &self,
-        ctx: MaliciousContext<'a, F>,
+        ctx: MaliciousContext<'a, F, G>,
         record_id: RecordId,
         to_helper: Role,
     ) -> Result<Self, Error>
     where
-        MaliciousContext<'a, F>: 'fut,
+        MaliciousContext<'a, F, G>: 'fut,
     {
         use crate::{
             protocol::context::SpecialAccessToMaliciousContext,
@@ -162,9 +163,9 @@ impl<'a, F: Field + ExtendableField> Reshare<MaliciousContext<'a, F>, RecordId>
 // `T` must be `Send + Sync` because we are passing `&T` into futures. In practice `T` is plain old data,
 // which is always `Sync`.
 #[async_trait]
-impl<T, C: Context> ReshareBorrowed<C, RecordId> for [T]
+impl<T, C: Context<G>, G: Gate> ReshareBorrowed<C, G, RecordId> for [T]
 where
-    T: Reshare<C, RecordId> + Send + Sync,
+    T: Reshare<C, G, RecordId> + Send + Sync,
 {
     type Output = Vec<T>;
     /// This is intended to be used for resharing bit-decomposed values, i.e., vectors with a
@@ -192,9 +193,9 @@ where
 // T must be `Sync` because we are passing `&T` into futures. In practice `T` is plain old data,
 // which is always `Sync`.
 #[async_trait]
-impl<T, C: Context> ReshareBorrowed<C, NoRecord> for [T]
+impl<T, C: Context<G>, G: Gate> ReshareBorrowed<C, G, NoRecord> for [T]
 where
-    T: Reshare<C, RecordId> + Send + Sync,
+    T: Reshare<C, G, RecordId> + Send + Sync,
 {
     type Output = Vec<T>;
     /// This is intended to be used for resharing arbitrarily long vectors of something other than
@@ -220,10 +221,10 @@ where
 // Note that this can delegate to either of the ReshareBorrowed implementations (short or long
 // vectors) depending on the specified RecordBinding.
 #[async_trait]
-impl<T, C: Context, B: RecordBinding> Reshare<C, B> for Vec<T>
+impl<T, C: Context<G>, G: Gate, B: RecordBinding> Reshare<C, G, B> for Vec<T>
 where
-    T: Reshare<C, RecordId> + Send + Sync,
-    [T]: ReshareBorrowed<C, B, Output = Vec<T>>,
+    T: Reshare<C, G, RecordId> + Send + Sync,
+    [T]: ReshareBorrowed<C, G, B, Output = Vec<T>>,
 {
     async fn reshare<'fut>(
         self: &Vec<T>,
@@ -320,6 +321,7 @@ mod tests {
                 malicious::MaliciousValidator,
                 prss::SharedRandomness,
                 sort::ReshareStep::{RandomnessForValidation, ReshareRx},
+                step::Gate,
                 RecordId,
             },
             rand::{thread_rng, Rng},
@@ -359,8 +361,8 @@ mod tests {
             }
         }
 
-        async fn reshare_with_additive_attack<F: Field>(
-            ctx: SemiHonestContext<'_>,
+        async fn reshare_with_additive_attack<F: Field, G: Gate>(
+            ctx: SemiHonestContext<'_, G>,
             input: &Replicated<F>,
             record_id: RecordId,
             to_helper: Role,
@@ -399,8 +401,8 @@ mod tests {
             }
         }
 
-        async fn reshare_malicious_with_additive_attack<F: Field + ExtendableField>(
-            ctx: MaliciousContext<'_, F>,
+        async fn reshare_malicious_with_additive_attack<F: Field + ExtendableField, G: Gate>(
+            ctx: MaliciousContext<'_, F, G>,
             input: &MaliciousReplicated<F>,
             record_id: RecordId,
             to_helper: Role,

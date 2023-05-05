@@ -5,6 +5,7 @@ use crate::{
     protocol::{
         context::{Context, SemiHonestContext},
         prss::SharedRandomness,
+        step::Gate,
         RecordId,
     },
     secret_sharing::replicated::{
@@ -23,14 +24,15 @@ use crate::{
 /// ## Errors
 /// Lots of things may go wrong here, from timeouts to bad output. They will be signalled
 /// back via the error response
-pub async fn sum_of_products<F>(
-    ctx: SemiHonestContext<'_>,
+pub async fn sum_of_products<F, G>(
+    ctx: SemiHonestContext<'_, G>,
     record_id: RecordId,
     a: &[Replicated<F>],
     b: &[Replicated<F>],
 ) -> Result<Replicated<F>, Error>
 where
     F: Field,
+    G: Gate,
 {
     assert_eq!(a.len(), b.len());
     let vec_len = a.len();
@@ -74,7 +76,7 @@ mod test {
     use super::sum_of_products;
     use crate::{
         ff::{Field, Fp31},
-        protocol::{context::Context, RecordId},
+        protocol::{context::Context, step::Gate, RecordId},
         rand::{thread_rng, Rng},
         secret_sharing::SharedValue,
         test_fixture::{Reconstruct, Runner, TestWorld},

@@ -5,6 +5,7 @@ use crate::{
     ipa_test_input,
     protocol::{
         ipa::{ipa, ipa_malicious},
+        step::Gate,
         BreakdownKey, MatchKey,
     },
     secret_sharing::{

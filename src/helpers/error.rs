@@ -1,7 +1,9 @@
+use std::fmt::Debug;
+
 use crate::{
     error::BoxError,
     helpers::{ChannelId, HelperIdentity, Message, Role, TotalRecords},
-    protocol::{step, RecordId},
+    protocol::{step::Gate, RecordId},
 };
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
@@ -9,9 +11,9 @@ use tokio::sync::mpsc::error::SendError;
 /// An error raised by the IPA supporting infrastructure.
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("An error occurred while sending data to {channel:?}: {inner}")]
+    #[error("An error occurred while sending data to {channel}: {inner}")]
     SendError {
-        channel: ChannelId,
+        channel: String,
 
         #[source]
         inner: BoxError,
@@ -49,18 +51,18 @@ pub enum Error {
     #[error("record ID {record_id:?} is out of range for {channel_id:?} (expected {total_records:?} records)")]
     TooManyRecords {
         record_id: RecordId,
-        channel_id: ChannelId,
+        channel_id: String,
         total_records: TotalRecords,
     },
 }
 
 impl Error {
-    pub fn send_error<E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>>(
-        channel: ChannelId,
+    pub fn send_error<E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>, G: Gate>(
+        channel: ChannelId<G>,
         inner: E,
     ) -> Error {
         Self::SendError {
-            channel,
+            channel: format!("channel[{:?},{:?}]", channel.role, channel.step),
             inner: inner.into(),
         }
     }
@@ -76,9 +78,9 @@ impl Error {
     }
 
     #[must_use]
-    pub fn serialization_error<E: Into<BoxError>>(
+    pub fn serialization_error<E: Into<BoxError>, G: Gate>(
         record_id: RecordId,
-        step: &step::Descriptive,
+        step: &G,
         inner: E,
     ) -> Error {
         Self::SerializationError {

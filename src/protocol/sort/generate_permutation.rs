@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::{
     error::Error,
     ff::Field,
@@ -9,6 +11,7 @@ use crate::{
             ShuffleRevealStep::{RevealPermutation, ShufflePermutation},
             SortStep::{ShuffleRevealPermutation, SortKeys},
         },
+        step::Gate,
         NoRecord, RecordId,
     },
     secret_sharing::{
@@ -35,9 +38,10 @@ pub struct RevealedAndRandomPermutations {
     pub randoms_for_shuffle: (Vec<u32>, Vec<u32>),
 }
 
-pub struct ShuffledPermutationWrapper<T, C: Context> {
+pub struct ShuffledPermutationWrapper<T, C: Context<G>, G: Gate> {
     pub perm: Vec<T>,
     pub ctx: C,
+    _marker: PhantomData<G>,
 }
 
 /// This is an implementation of `OptApplyInv` (Algorithm 13) and `OptCompose` (Algorithm 14) described in:
@@ -46,8 +50,9 @@ pub struct ShuffledPermutationWrapper<T, C: Context> {
 /// <https://eprint.iacr.org/2019/695.pdf>.
 pub(super) async fn shuffle_and_reveal_permutation<
     F: Field,
-    S: SecretSharing<F> + Reshare<C, RecordId> + Reveal<C, RecordId, Output = F>,
-    C: Context,
+    S: SecretSharing<F> + Reshare<C, G, RecordId> + Reveal<C, G, RecordId, Output = F>,
+    C: Context<G>,
+    G: Gate,
 >(
     ctx: C,
     input_permutation: Vec<S>,
@@ -71,6 +76,7 @@ pub(super) async fn shuffle_and_reveal_permutation<
     let wrapper = ShuffledPermutationWrapper {
         perm: shuffled_permutation,
         ctx,
+        _marker: PhantomData,
     };
     let revealed_permutation = wrapper.reveal(reveal_ctx, NoRecord).await?;
 
@@ -86,10 +92,13 @@ pub(super) async fn shuffle_and_reveal_permutation<
 /// 1. Get random permutation 2/3 shared across helpers
 /// 2. Shuffle shares three times
 /// 3. Validate the accumulated macs - this returns the revealed permutation
-pub(super) async fn malicious_shuffle_and_reveal_permutation<F: Field + ExtendableField>(
-    m_ctx: MaliciousContext<'_, F>,
+pub(super) async fn malicious_shuffle_and_reveal_permutation<
+    F: Field + ExtendableField,
+    G: Gate,
+>(
+    m_ctx: MaliciousContext<'_, F, G>,
     input_permutation: Vec<MaliciousReplicated<F>>,
-    malicious_validator: MaliciousValidator<'_, F>,
+    malicious_validator: MaliciousValidator<'_, F, G>,
 ) -> Result<RevealedAndRandomPermutations, Error> {
     let random_permutations_for_shuffle = get_two_of_three_random_permutations(
         input_permutation.len().try_into().unwrap(),
@@ -110,6 +119,7 @@ pub(super) async fn malicious_shuffle_and_reveal_permutation<F: Field + Extendab
         .validate(ShuffledPermutationWrapper {
             perm: shuffled_permutation,
             ctx: m_ctx,
+            _marker: PhantomData,
         })
         .await?;
 
@@ -126,8 +136,8 @@ pub(super) async fn malicious_shuffle_and_reveal_permutation<F: Field + Extendab
 /// If unable to convert sort keys length to u32
 /// # Errors
 /// If unable to convert sort keys length to u32
-pub async fn generate_permutation_and_reveal_shuffled<F: Field>(
-    ctx: SemiHonestContext<'_>,
+pub async fn generate_permutation_and_reveal_shuffled<F: Field, G: Gate>(
+    ctx: SemiHonestContext<'_, G>,
     sort_keys: impl Iterator<Item = &Vec<Vec<Replicated<F>>>>,
 ) -> Result<RevealedAndRandomPermutations, Error> {
     let sort_permutation = generate_permutation_opt(ctx.narrow(&SortKeys), sort_keys).await?;
@@ -141,8 +151,11 @@ pub async fn generate_permutation_and_reveal_shuffled<F: Field>(
 /// If unable to convert sort keys length to u32
 /// # Errors
 /// If unable to convert sort keys length to u32
-pub async fn malicious_generate_permutation_and_reveal_shuffled<F: Field + ExtendableField>(
-    sh_ctx: SemiHonestContext<'_>,
+pub async fn malicious_generate_permutation_and_reveal_shuffled<
+    F: Field + ExtendableField,
+    G: Gate,
+>(
+    sh_ctx: SemiHonestContext<'_, G>,
     sort_keys: impl Iterator<Item = &Vec<Vec<Replicated<F>>>>,
 ) -> Result<RevealedAndRandomPermutations, Error> {
     let (malicious_validator, sort_permutation) =

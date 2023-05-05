@@ -6,7 +6,7 @@ use crate::{
         basics::{SecureMul, ZeroPositions},
         boolean::xor_sparse,
         context::Context,
-        step::IpaProtocolStep,
+        step::{Gate, IpaProtocolStep},
         RecordId,
     },
     secret_sharing::{
@@ -109,15 +109,16 @@ pub fn convert_all_bits_local<F: Field, B: GaloisField>(
 /// Convert a locally-decomposed single bit into field elements.
 /// # Errors
 /// Fails only if multiplication fails.
-pub async fn convert_bit<F, C, S>(
+pub async fn convert_bit<F, C, G, S>(
     ctx: C,
     record_id: RecordId,
     locally_converted_bits: &BitConversionTriple<S>,
 ) -> Result<S, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + SecureMul<C, G>,
 {
     let (sh0, sh1, sh2) = (
         &locally_converted_bits.0[0],
@@ -138,7 +139,7 @@ where
 /// Propagates errors from convert shares
 /// # Panics
 /// Propagates panics from convert shares
-pub async fn convert_all_bits<F, C, S>(
+pub async fn convert_all_bits<F, C, G, S>(
     ctx: &C,
     locally_converted_bits: &[Vec<BitConversionTriple<S>>],
     num_bits: u32,
@@ -146,8 +147,9 @@ pub async fn convert_all_bits<F, C, S>(
 ) -> Result<Vec<Vec<Vec<S>>>, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + SecureMul<C, G>,
 {
     let ctx = ctx.set_total_records(locally_converted_bits.len());
 
@@ -178,15 +180,16 @@ where
 /// Propagates errors from convert shares
 /// # Panics
 /// Propagates panics from convert shares
-pub async fn convert_bit_list<F, C, S>(
+pub async fn convert_bit_list<F, C, G, S>(
     ctx: C,
     locally_converted_bits: &[&BitConversionTriple<S>],
     record_id: RecordId,
 ) -> Result<Vec<S>, Error>
 where
     F: Field,
-    C: Context,
-    S: LinearSecretSharing<F> + SecureMul<C>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + SecureMul<C, G>,
 {
     // True concurrency needed here (different contexts).
     ctx.parallel_join(

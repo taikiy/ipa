@@ -2,7 +2,7 @@ use super::{bitwise_less_than_prime::BitwiseLessThanPrime, RandomBits};
 use crate::{
     error::Error,
     ff::{Field, PrimeField},
-    protocol::{context::Context, BasicProtocols, RecordId},
+    protocol::{context::Context, step::Gate, BasicProtocols, RecordId},
     secret_sharing::{
         replicated::malicious::{
             AdditiveShare as MaliciousReplicated, DowngradeMalicious, ExtendableField,
@@ -72,14 +72,15 @@ where
 // number that has the same number of bits as the prime.
 // With `Fp32BitPrime` (prime is `2^32 - 5`), that chance is around
 // 1 * 10^-9. For Fp31, the chance is 1 out of 32 =~ 3%.
-pub async fn solved_bits<F, S, C>(
+pub async fn solved_bits<F, S, C, G>(
     ctx: C,
     record_id: RecordId,
 ) -> Result<Option<RandomBitsShare<F, S>>, Error>
 where
     F: PrimeField,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
-    C: Context + RandomBits<F, Share = S>,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
+    C: Context<G> + RandomBits<F, Share = S>,
+    G: Gate,
 {
     //
     // step 1 & 2
@@ -112,11 +113,12 @@ where
     }))
 }
 
-async fn is_less_than_p<F, C, S>(ctx: C, record_id: RecordId, b_b: &[S]) -> Result<bool, Error>
+async fn is_less_than_p<F, C, G, S>(ctx: C, record_id: RecordId, b_b: &[S]) -> Result<bool, Error>
 where
     F: PrimeField,
-    C: Context,
-    S: LinearSecretSharing<F> + BasicProtocols<C, F>,
+    C: Context<G>,
+    G: Gate,
+    S: LinearSecretSharing<F> + BasicProtocols<C, G, F>,
 {
     let c_b =
         BitwiseLessThanPrime::less_than_prime(ctx.narrow(&Step::IsPLessThanB), record_id, b_b)
