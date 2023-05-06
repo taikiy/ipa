@@ -393,7 +393,7 @@ where
     MaliciousReplicated<F>: Serializable + BasicProtocols<MaliciousContext<'a, F, G>, G, F>,
     Replicated<F>: Serializable + BasicProtocols<SemiHonestContext<'a, G>, G, F>,
 {
-    let malicious_validator = MaliciousValidator::<F>::new(sh_ctx.clone());
+    let malicious_validator = MaliciousValidator::<F, G>::new(sh_ctx.clone());
     let m_ctx = malicious_validator.context();
 
     let (mk_shares, bk_shares): (Vec<_>, Vec<_>) = input_rows
@@ -424,12 +424,12 @@ where
     .unwrap();
 
     let malicious_validator =
-        MaliciousValidator::<F>::new(sh_ctx.narrow(&Step::AfterConvertAllBits));
+        MaliciousValidator::<F, G>::new(sh_ctx.narrow(&Step::AfterConvertAllBits));
     let m_ctx = malicious_validator.context();
 
     let gf2_match_key_bits = get_gf2_match_key_bits(input_rows);
 
-    let binary_validator = MaliciousValidator::<Gf2>::new(sh_ctx.narrow(&Step::BinaryValidator));
+    let binary_validator = MaliciousValidator::<Gf2, G>::new(sh_ctx.narrow(&Step::BinaryValidator));
     let binary_m_ctx = binary_validator.context();
 
     let upgraded_gf2_match_key_bits = binary_m_ctx.upgrade(gf2_match_key_bits).await?;
@@ -592,7 +592,7 @@ pub mod tests {
 
         let result: Vec<GenericReportTestInput<_, MatchKey, BreakdownKey>> = world
             .semi_honest(records, |ctx, input_rows| async move {
-                ipa::<Fp31, MatchKey, BreakdownKey>(
+                ipa::<_, Fp31, MatchKey, BreakdownKey>(
                     ctx,
                     &input_rows,
                     IpaQueryConfig::new(
@@ -644,7 +644,7 @@ pub mod tests {
 
         let result: Vec<GenericReportTestInput<_, MatchKey, BreakdownKey>> = world
             .semi_honest(records, |ctx, input_rows| async move {
-                ipa_malicious::<_, MatchKey, BreakdownKey>(
+                ipa_malicious::<_, _, MatchKey, BreakdownKey>(
                     ctx,
                     &input_rows,
                     IpaQueryConfig::new(
@@ -704,7 +704,7 @@ pub mod tests {
 
         let result: Vec<GenericReportTestInput<_, MatchKey, BreakdownKey>> = world
             .semi_honest(records, |ctx, input_rows| async move {
-                ipa::<Fp31, MatchKey, BreakdownKey>(
+                ipa::<_, Fp31, MatchKey, BreakdownKey>(
                     ctx,
                     &input_rows,
                     IpaQueryConfig::new(
@@ -756,7 +756,7 @@ pub mod tests {
 
         let result: Vec<GenericReportTestInput<_, MatchKey, BreakdownKey>> = world
             .semi_honest(records, |ctx, input_rows| async move {
-                ipa_malicious::<_, MatchKey, BreakdownKey>(
+                ipa_malicious::<_, _, MatchKey, BreakdownKey>(
                     ctx,
                     &input_rows,
                     IpaQueryConfig::new(
@@ -819,7 +819,7 @@ pub mod tests {
 
         let result: Vec<GenericReportTestInput<Fp31, MatchKey, BreakdownKey>> = world
             .semi_honest(records.clone(), |ctx, input_rows| async move {
-                ipa::<Fp31, MatchKey, BreakdownKey>(
+                ipa::<_, Fp31, MatchKey, BreakdownKey>(
                     ctx,
                     &input_rows,
                     IpaQueryConfig::new(
@@ -849,7 +849,7 @@ pub mod tests {
 
         let result: Vec<GenericReportTestInput<_, MatchKey, BreakdownKey>> = world
             .semi_honest(records, |ctx, input_rows| async move {
-                ipa_malicious::<Fp31, MatchKey, BreakdownKey>(
+                ipa_malicious::<_, Fp31, MatchKey, BreakdownKey>(
                     ctx,
                     &input_rows,
                     IpaQueryConfig::new(
@@ -912,7 +912,7 @@ pub mod tests {
 
         let result: Vec<GenericReportTestInput<Fp31, MatchKey, BreakdownKey>> = world
             .semi_honest(records.clone(), |ctx, input_rows| async move {
-                ipa::<Fp31, MatchKey, BreakdownKey>(
+                ipa::<_, Fp31, MatchKey, BreakdownKey>(
                     ctx,
                     &input_rows,
                     IpaQueryConfig::new(
@@ -942,7 +942,7 @@ pub mod tests {
 
         let result: Vec<GenericReportTestInput<_, MatchKey, BreakdownKey>> = world
             .semi_honest(records, |ctx, input_rows| async move {
-                ipa_malicious::<Fp31, MatchKey, BreakdownKey>(
+                ipa_malicious::<_, Fp31, MatchKey, BreakdownKey>(
                     ctx,
                     &input_rows,
                     IpaQueryConfig::new(
@@ -1067,7 +1067,7 @@ pub mod tests {
         let world = TestWorld::default();
         let result: Vec<GenericReportTestInput<Fp31, MatchKey, BreakdownKey>> = world
             .semi_honest(records, |ctx, input_rows| async move {
-                ipa::<Fp31, MatchKey, BreakdownKey>(
+                ipa::<_, Fp31, MatchKey, BreakdownKey>(
                     ctx,
                     &input_rows,
                     IpaQueryConfig::new(
@@ -1230,14 +1230,14 @@ pub mod tests {
             let _: Vec<GenericReportTestInput<Fp32BitPrime, MatchKey, BreakdownKey>> = world
                 .semi_honest(records, |ctx, input_rows| async move {
                     match mode {
-                        SemiHonest => ipa::<Fp32BitPrime, MatchKey, BreakdownKey>(
+                        SemiHonest => ipa::<_, Fp32BitPrime, MatchKey, BreakdownKey>(
                             ctx,
                             &input_rows,
                             query_config,
                         )
                         .await
                         .unwrap(),
-                        Malicious => ipa_malicious::<Fp32BitPrime, MatchKey, BreakdownKey>(
+                        Malicious => ipa_malicious::<_, Fp32BitPrime, MatchKey, BreakdownKey>(
                             ctx,
                             &input_rows,
                             query_config,

@@ -24,10 +24,12 @@ impl Runner {
         input: ByteArrStream,
     ) -> Box<dyn ProtocolResult> {
         match field {
-            FieldType::Fp31 => Box::new(self.run_internal::<Fp31>(ctx, input).await.unwrap()),
-            FieldType::Fp32BitPrime => {
-                Box::new(self.run_internal::<Fp32BitPrime>(ctx, input).await.unwrap())
-            }
+            FieldType::Fp31 => Box::new(self.run_internal::<Fp31, G>(ctx, input).await.unwrap()),
+            FieldType::Fp32BitPrime => Box::new(
+                self.run_internal::<Fp32BitPrime, G>(ctx, input)
+                    .await
+                    .unwrap(),
+            ),
         }
     }
 
@@ -107,7 +109,7 @@ mod tests {
             helper_shares
                 .into_iter()
                 .zip(contexts)
-                .map(|(shares, context)| Runner.run_internal::<Fp31>(context, shares)),
+                .map(|(shares, context)| Runner.run_internal::<Fp31, _>(context, shares)),
         )
         .await;
 

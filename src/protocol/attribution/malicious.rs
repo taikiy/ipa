@@ -98,7 +98,7 @@ where
     )
     .await?;
 
-    let (malicious_validator, output) = malicious_aggregate_credit::<F, BK>(
+    let (malicious_validator, output) = malicious_aggregate_credit::<G, F, BK>(
         malicious_validator,
         sh_ctx,
         user_capped_credits.into_iter(),

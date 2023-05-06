@@ -295,7 +295,7 @@ mod tests {
                         .await
                         .unwrap();
 
-                malicious_generate_permutation_opt::<Fp31, _>(
+                malicious_generate_permutation_opt::<_, Fp31, _>(
                     ctx.narrow("sort"),
                     converted_shares.iter(),
                 )

@@ -119,7 +119,7 @@ mod tests {
         }
     }
 
-    async fn bit_decomposition<F, G>(world: &TestWorld, a: F) -> Vec<F>
+    async fn bit_decomposition<F>(world: &TestWorld, a: F) -> Vec<F>
     where
         F: PrimeField + Sized,
         Standard: Distribution<F>,

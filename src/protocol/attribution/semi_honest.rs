@@ -86,7 +86,7 @@ where
     )
     .await?;
 
-    aggregate_credit::<F, BK>(
+    aggregate_credit::<G, F, BK>(
         ctx.narrow(&Step::AggregateCredit),
         user_capped_credits.into_iter(),
         config.max_breakdown_key,

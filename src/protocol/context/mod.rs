@@ -46,7 +46,7 @@ pub trait Context<G: Gate>: Clone + Send + Sync + SeqJoin {
     /// If `prss_rng()` is invoked for the same context, this will panic.  Use of
     /// these two functions are mutually exclusive.
     #[must_use]
-    fn prss(&self) -> InstrumentedIndexedSharedRandomness<'_>;
+    fn prss(&self) -> InstrumentedIndexedSharedRandomness<'_, G>;
 
     /// Get a pair of PRSS-based RNGs.  The first is shared with the helper to the "left",
     /// the second is shared with the helper to the "right".
@@ -58,8 +58,8 @@ pub trait Context<G: Gate>: Clone + Send + Sync + SeqJoin {
     fn prss_rng(
         &self,
     ) -> (
-        InstrumentedSequentialSharedRandomness,
-        InstrumentedSequentialSharedRandomness,
+        InstrumentedSequentialSharedRandomness<G>,
+        InstrumentedSequentialSharedRandomness<G>,
     );
 
     fn send_channel<M: Message>(&self, role: Role) -> SendingEnd<M, G>;
@@ -74,7 +74,7 @@ mod tests {
         protocol::{
             malicious::{MaliciousValidator, Step::MaliciousProtocol},
             prss::SharedRandomness,
-            step::StepNarrow,
+            step::{self, StepNarrow},
             RecordId,
         },
         secret_sharing::replicated::{
@@ -169,7 +169,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn semi_honest_metrics<G: Gate>() {
+    async fn semi_honest_metrics() {
         let world = TestWorld::new_with(TestWorldConfig::default().enable_metrics());
         let input = (0..10u128).map(Fp31::truncate_from).collect::<Vec<_>>();
         let input_len = input.len();
@@ -194,7 +194,7 @@ mod tests {
 
         let input_size = input.len();
         let snapshot = world.metrics_snapshot();
-        let metrics_step = G::default()
+        let metrics_step = step::Descriptive::default()
             .narrow(&TestWorld::execution_step(0))
             .narrow("metrics");
 
@@ -231,7 +231,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn malicious_metrics<G: Gate>() {
+    async fn malicious_metrics() {
         let world = TestWorld::new_with(TestWorldConfig::default().enable_metrics());
         let input = vec![Fp31::truncate_from(0u128), Fp31::truncate_from(1u128)];
         let input_len = input.len();
@@ -251,7 +251,7 @@ mod tests {
             })
             .await;
 
-        let metrics_step = G::default()
+        let metrics_step = step::Descriptive::default()
             .narrow(&TestWorld::execution_step(0))
             // TODO: leaky abstraction, test world should tell us the exact step
             .narrow(&MaliciousProtocol)

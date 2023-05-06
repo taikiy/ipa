@@ -86,7 +86,7 @@ where
 mod test {
     use crate::{
         ff::{Field, Fp31},
-        protocol::{basics::SecureMul, context::Context, step::Gate, RecordId},
+        protocol::{basics::SecureMul, context::Context, RecordId},
         rand::{thread_rng, Rng},
         seq_join::SeqJoin,
         test_fixture::{Reconstruct, Runner, TestWorld},

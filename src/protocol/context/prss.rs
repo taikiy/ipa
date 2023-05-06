@@ -4,7 +4,7 @@ use crate::{
     helpers::Role,
     protocol::{
         prss::{IndexedSharedRandomness, SequentialSharedRandomness, SharedRandomness},
-        step,
+        step::Gate,
     },
     sync::Arc,
     telemetry::{
@@ -15,19 +15,15 @@ use crate::{
 use rand_core::{Error, RngCore};
 
 /// Wrapper around `IndexedSharedRandomness` that instrument calls to `generate_values`
-pub struct InstrumentedIndexedSharedRandomness<'a> {
+pub struct InstrumentedIndexedSharedRandomness<'a, G: Gate> {
     inner: Arc<IndexedSharedRandomness>,
-    step: &'a step::Descriptive,
+    step: &'a G,
     role: Role,
 }
 
-impl<'a> InstrumentedIndexedSharedRandomness<'a> {
+impl<'a, G: Gate> InstrumentedIndexedSharedRandomness<'a, G> {
     #[must_use]
-    pub fn new(
-        source: Arc<IndexedSharedRandomness>,
-        step: &'a step::Descriptive,
-        role: Role,
-    ) -> Self {
+    pub fn new(source: Arc<IndexedSharedRandomness>, step: &'a G, role: Role) -> Self {
         Self {
             inner: source,
             step,
@@ -36,7 +32,7 @@ impl<'a> InstrumentedIndexedSharedRandomness<'a> {
     }
 }
 
-impl SharedRandomness for InstrumentedIndexedSharedRandomness<'_> {
+impl<G: Gate> SharedRandomness for InstrumentedIndexedSharedRandomness<'_, G> {
     fn generate_values<I: Into<u128>>(&self, index: I) -> (u128, u128) {
         let step = self.step.as_ref().to_string();
         // TODO: what we really want here is a gauge indicating the maximum index used to generate
@@ -48,19 +44,15 @@ impl SharedRandomness for InstrumentedIndexedSharedRandomness<'_> {
 }
 
 /// Wrapper for `SequentialSharedRandomness` that instrument calls to generate random values.
-pub struct InstrumentedSequentialSharedRandomness<'a> {
+pub struct InstrumentedSequentialSharedRandomness<'a, G: Gate> {
     inner: SequentialSharedRandomness,
-    step: &'a step::Descriptive,
+    step: &'a G,
     role: Role,
 }
 
-impl<'a> InstrumentedSequentialSharedRandomness<'a> {
+impl<'a, G: Gate> InstrumentedSequentialSharedRandomness<'a, G> {
     #[must_use]
-    pub fn new(
-        source: SequentialSharedRandomness,
-        step: &'a step::Descriptive,
-        role: Role,
-    ) -> Self {
+    pub fn new(source: SequentialSharedRandomness, step: &'a G, role: Role) -> Self {
         Self {
             inner: source,
             step,
@@ -69,7 +61,7 @@ impl<'a> InstrumentedSequentialSharedRandomness<'a> {
     }
 }
 
-impl RngCore for InstrumentedSequentialSharedRandomness<'_> {
+impl<G: Gate> RngCore for InstrumentedSequentialSharedRandomness<'_, G> {
     #[allow(clippy::cast_possible_truncation)]
     fn next_u32(&mut self) -> u32 {
         self.next_u64() as u32

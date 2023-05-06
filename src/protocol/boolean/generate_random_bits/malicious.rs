@@ -20,7 +20,7 @@ impl<F: PrimeField + ExtendableField, G: Gate> RandomBits<F> for MaliciousContex
 
     /// Generates a sequence of `l` random bit sharings in the target field `F`.
     async fn generate_random_bits(self, record_id: RecordId) -> Result<Vec<Self::Share>, Error> {
-        let triples = random_bits_triples::<F, _>(&self, record_id);
+        let triples = random_bits_triples::<F, _, _>(&self, record_id);
 
         // Upgrade the replicated shares to malicious, in parallel,
         let c = self.narrow(&Step::UpgradeBitTriples);

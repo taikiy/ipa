@@ -122,7 +122,7 @@ mod tests {
                 max_breakdown_key: 3,
             };
             let input = ByteArrStream::from(shares);
-            Runner(query_config).run_internal::<Fp31, MatchKey, BreakdownKey>(ctx, input)
+            Runner(query_config).run_internal::<_, Fp31, MatchKey, BreakdownKey>(ctx, input)
         }))
         .await;
 

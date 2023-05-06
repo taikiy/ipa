@@ -338,7 +338,7 @@ mod tests {
     use proptest::proptest;
     use rand::{distributions::Standard, prelude::Distribution, Rng};
 
-    async fn bitwise_lt<F, G>(world: &TestWorld, a: F, b: u128) -> F
+    async fn bitwise_lt<F>(world: &TestWorld, a: F, b: u128) -> F
     where
         F: PrimeField + ExtendableField,
         (F, F): Sized,

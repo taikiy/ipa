@@ -147,7 +147,7 @@ mod tests {
             let v = world
                 .semi_honest((), |ctx, _| async move {
                     let ctx = ctx.set_total_records(usize::try_from(INNER).unwrap());
-                    let rbg = RandomBitsGenerator::<Fp31, _, _>::new(ctx);
+                    let rbg = RandomBitsGenerator::<Fp31, _, _, _>::new(ctx);
                     drop(
                         // This can't use `seq_try_join_all` because this isn't sequential.
                         try_join_all((0..INNER).map(|i| rbg.generate(RecordId::from(i))))
@@ -177,7 +177,7 @@ mod tests {
         let world = TestWorld::default();
         let contexts = world.contexts();
 
-        let validators = contexts.map(MaliciousValidator::<Fp31>::new);
+        let validators = contexts.map(MaliciousValidator::<Fp31, _>::new);
         let rbg = validators
             .iter()
             .map(|v| RandomBitsGenerator::new(v.context().set_total_records(1)))

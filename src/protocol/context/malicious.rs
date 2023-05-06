@@ -26,7 +26,7 @@ use crate::{
         malicious::MaliciousValidatorAccumulator,
         modulus_conversion::BitConversionTriple,
         prss::Endpoint as PrssEndpoint,
-        step::{BitOpStep, Gate, Step, StepNarrow},
+        step::{BitOpStep, Gate, Step},
         NoRecord, RecordBinding, RecordId,
     },
     repeat64str,
@@ -171,7 +171,7 @@ impl<'a, F: Field + ExtendableField, G: Gate> MaliciousContext<'a, F, G> {
     /// by other helpers.  These are caught later.
     pub async fn upgrade_for<T, M>(&self, record_id: RecordId, input: T) -> Result<M, Error>
     where
-        for<'u> UpgradeContext<'u, F, RecordId>: UpgradeToMalicious<T, M>,
+        for<'u> UpgradeContext<'u, F, G, RecordId>: UpgradeToMalicious<T, M>,
     {
         UpgradeContext {
             ctx: self.narrow(&UpgradeStep),
@@ -218,7 +218,7 @@ impl<'a, F: Field + ExtendableField, G: Gate> Context<G> for MaliciousContext<'a
         self.total_records.is_last(record_id)
     }
 
-    fn prss(&self) -> InstrumentedIndexedSharedRandomness<'_> {
+    fn prss(&self) -> InstrumentedIndexedSharedRandomness<'_, G> {
         let prss = self.inner.prss.indexed(self.step());
 
         InstrumentedIndexedSharedRandomness::new(prss, &self.step, self.role())
@@ -227,8 +227,8 @@ impl<'a, F: Field + ExtendableField, G: Gate> Context<G> for MaliciousContext<'a
     fn prss_rng(
         &self,
     ) -> (
-        InstrumentedSequentialSharedRandomness<'_>,
-        InstrumentedSequentialSharedRandomness<'_>,
+        InstrumentedSequentialSharedRandomness<'_, G>,
+        InstrumentedSequentialSharedRandomness<'_, G>,
     ) {
         let (left, right) = self.inner.prss.sequential(self.step());
         (
@@ -591,7 +591,8 @@ where
     U: Send + 'static,
     TM: Send + Sized,
     UM: Send + Sized,
-    for<'u> UpgradeContext<'u, F, NoRecord>: UpgradeToMalicious<T, TM> + UpgradeToMalicious<U, UM>,
+    for<'u> UpgradeContext<'u, F, G, NoRecord>:
+        UpgradeToMalicious<T, TM> + UpgradeToMalicious<U, UM>,
 {
     async fn upgrade(self, input: (T, U)) -> Result<(TM, UM), Error> {
         try_join(
@@ -624,7 +625,7 @@ where
     G: Gate,
     T: Send + 'static,
     M: Send + 'static,
-    for<'u> UpgradeContext<'u, F, RecordId>: UpgradeToMalicious<T, M>,
+    for<'u> UpgradeContext<'u, F, G, RecordId>: UpgradeToMalicious<T, M>,
 {
     async fn upgrade(self, input: Vec<T>) -> Result<Vec<M>, Error> {
         let ctx = self.ctx.set_total_records(input.len());
@@ -653,7 +654,7 @@ where
     G: Gate,
     T: Send + 'static,
     M: Send + 'static,
-    for<'u> UpgradeContext<'u, F, RecordId>: UpgradeToMalicious<T, M>,
+    for<'u> UpgradeContext<'u, F, G, RecordId>: UpgradeToMalicious<T, M>,
 {
     /// # Panics
     /// Panics if input is empty
@@ -708,7 +709,7 @@ where
     F: Field + ExtendableField,
     G: Gate,
     T: Send + 'static,
-    for<'u> UpgradeContext<'u, F, RecordId>: UpgradeToMalicious<T, M>,
+    for<'u> UpgradeContext<'u, F, G, RecordId>: UpgradeToMalicious<T, M>,
 {
     async fn upgrade(self, input: T) -> Result<M, Error> {
         let ctx = if self.ctx.total_records.is_unspecified() {

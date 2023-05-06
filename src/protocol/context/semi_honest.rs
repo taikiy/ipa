@@ -8,7 +8,7 @@ use crate::{
         },
         malicious::MaliciousValidatorAccumulator,
         prss::Endpoint as PrssEndpoint,
-        step::{Gate, Step, StepNarrow},
+        step::{Gate, Step},
         RecordId,
     },
     secret_sharing::replicated::{
@@ -109,7 +109,7 @@ impl<'a, G: Gate> Context<G> for SemiHonestContext<'a, G> {
         self.total_records.is_last(record_id)
     }
 
-    fn prss(&self) -> InstrumentedIndexedSharedRandomness {
+    fn prss(&self) -> InstrumentedIndexedSharedRandomness<G> {
         let prss = self.inner.prss.indexed(self.step());
 
         InstrumentedIndexedSharedRandomness::new(prss, &self.step, self.role())
@@ -118,8 +118,8 @@ impl<'a, G: Gate> Context<G> for SemiHonestContext<'a, G> {
     fn prss_rng(
         &self,
     ) -> (
-        InstrumentedSequentialSharedRandomness<'_>,
-        InstrumentedSequentialSharedRandomness<'_>,
+        InstrumentedSequentialSharedRandomness<'_, G>,
+        InstrumentedSequentialSharedRandomness<'_, G>,
     ) {
         let (left, right) = self.inner.prss.sequential(self.step());
         (

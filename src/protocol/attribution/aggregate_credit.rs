@@ -626,7 +626,7 @@ mod tests {
                         .zip(converted_bk_shares)
                         .map(|(row, bk)| MCAggregateCreditInputRow::new(bk, row.credit.clone()));
 
-                    aggregate_credit::<Fp32BitPrime, BreakdownKey>(
+                    aggregate_credit::<_, Fp32BitPrime, BreakdownKey>(
                         ctx,
                         modulus_converted_shares,
                         MAX_BREAKDOWN_KEY,
