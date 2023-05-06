@@ -9,7 +9,7 @@ pub use crypto::{Generator, GeneratorFactory, KeyExchange, SharedRandomness};
 pub use no_op::{Generator, GeneratorFactory, KeyExchange, SharedRandomness};
 
 use crate::{
-    protocol::step,
+    protocol::step::Gate,
     rand::{CryptoRng, RngCore},
     sync::{Arc, Mutex},
 };
@@ -157,7 +157,7 @@ impl Endpoint {
     /// # Panics
     /// When used incorrectly.  For instance, if you ask for an RNG and then ask
     /// for a PRSS using the same key.
-    pub fn indexed(&self, key: &step::Descriptive) -> Arc<IndexedSharedRandomness> {
+    pub fn indexed<G: Gate>(&self, key: &G) -> Arc<IndexedSharedRandomness> {
         self.inner.lock().unwrap().indexed(key.as_ref())
     }
 
@@ -165,9 +165,9 @@ impl Endpoint {
     ///
     /// # Panics
     /// This can only be called once.  After that, calls to this function or `indexed` will panic.
-    pub fn sequential(
+    pub fn sequential<G: Gate>(
         &self,
-        key: &step::Descriptive,
+        key: &G,
     ) -> (SequentialSharedRandomness, SequentialSharedRandomness) {
         self.inner.lock().unwrap().sequential(key.as_ref())
     }

@@ -214,7 +214,6 @@ mod tests {
         protocol::{
             boolean::add_constant::{add_constant, maybe_add_constant_mod2l},
             context::Context,
-            step::Gate,
             RecordId,
         },
         secret_sharing::{replicated::malicious::ExtendableField, SharedValue},

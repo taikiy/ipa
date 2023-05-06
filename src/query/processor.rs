@@ -3,7 +3,7 @@ use crate::{
         query::{PrepareQuery, QueryConfig, QueryInput},
         Gateway, GatewayConfig, Role, RoleAssignment, Transport, TransportError, TransportImpl,
     },
-    protocol::QueryId,
+    protocol::{step::Gate, QueryId},
     query::{
         executor,
         state::{QueryState, QueryStatus, RunningQueries, StateError},
@@ -178,7 +178,7 @@ impl Processor {
     ///
     /// ## Panics
     /// If failed to obtain an exclusive access to the query collection.
-    pub fn receive_inputs(
+    pub fn receive_inputs<G: Gate>(
         &self,
         transport: TransportImpl,
         input: QueryInput,
@@ -192,7 +192,7 @@ impl Processor {
                         input.query_id, query_id,
                         "received inputs for a different query"
                     );
-                    let gateway = Gateway::new(
+                    let gateway = Gateway::<G>::new(
                         query_id,
                         GatewayConfig::default(),
                         role_assignment,

@@ -178,7 +178,7 @@ pub trait Runner {
         O: Send + Debug,
         H: Fn(SemiHonestContext<'a, G>, A) -> R + Send + Sync,
         R: Future<Output = O> + Send,
-        G: Gate;
+        G: Gate + 'a;
 
     async fn malicious<'a, F, I, A, O, M, H, R, P, G>(&'a self, input: I, helper_fn: H) -> [O; 3]
     where
@@ -191,7 +191,7 @@ pub trait Runner {
         H: Fn(MaliciousContext<'a, F, G>, M) -> R + Send + Sync,
         R: Future<Output = P> + Send,
         P: DowngradeMalicious<Target = O> + Clone + Send + Debug,
-        G: Gate,
+        G: Gate + 'a,
         [P; 3]: ValidateMalicious<F>,
         Standard: Distribution<F>;
 }

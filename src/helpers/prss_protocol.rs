@@ -2,7 +2,7 @@ use crate::{
     helpers::{ChannelId, Direction, Error, Gateway, TotalRecords, Transport},
     protocol::{
         prss,
-        step::{Gate, Step, StepNarrow},
+        step::{Gate, Step},
         RecordId,
     },
 };

@@ -61,11 +61,12 @@ where
     //
     // 1. Add aggregation bits and new rows per unique breakdown_key
     //
-    let capped_credits_with_aggregation_bits = add_aggregation_bits_and_breakdown_keys::<_, _, _, BK>(
-        &ctx,
-        capped_credits,
-        max_breakdown_key,
-    );
+    let capped_credits_with_aggregation_bits =
+        add_aggregation_bits_and_breakdown_keys::<_, _, _, _, BK>(
+            &ctx,
+            capped_credits,
+            max_breakdown_key,
+        );
 
     //
     // 2. Sort by `breakdown_key`. Rows with `aggregation_bit` = 0 must
@@ -160,11 +161,12 @@ where
         return Ok((malicious_validator, res));
     }
 
-    let capped_credits_with_aggregation_bits = add_aggregation_bits_and_breakdown_keys::<_, _, _, BK>(
-        &m_ctx,
-        capped_credits,
-        max_breakdown_key,
-    );
+    let capped_credits_with_aggregation_bits =
+        add_aggregation_bits_and_breakdown_keys::<_, _, _, _, BK>(
+            &m_ctx,
+            capped_credits,
+            max_breakdown_key,
+        );
 
     let capped_credits_with_aggregation_bits = malicious_validator
         .validate(capped_credits_with_aggregation_bits)

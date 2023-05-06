@@ -76,7 +76,7 @@ mod test {
     use super::sum_of_products;
     use crate::{
         ff::{Field, Fp31},
-        protocol::{context::Context, step::Gate, RecordId},
+        protocol::{context::Context, RecordId},
         rand::{thread_rng, Rng},
         secret_sharing::SharedValue,
         test_fixture::{Reconstruct, Runner, TestWorld},

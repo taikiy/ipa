@@ -6,9 +6,7 @@ use crate::{
         ByteArrStream, Gateway,
     },
     protocol::{
-        attribution::input::MCAggregateCreditOutputRow,
-        context::SemiHonestContext,
-        step::{self, StepNarrow, Gate},
+        attribution::input::MCAggregateCreditOutputRow, context::SemiHonestContext, step::Gate,
     },
     query::runner::IpaRunner,
     secret_sharing::{replicated::semi_honest::AdditiveShare, Linear as LinearSecretSharing},
@@ -71,7 +69,7 @@ pub fn start_query<G: Gate>(
         // TODO: make it a generic argument for this function
         let mut rng = StdRng::from_entropy();
         // Negotiate PRSS first
-        let step = step::Descriptive::default().narrow(&config.query_type);
+        let step = G::default().narrow(&config.query_type);
         let prss = negotiate_prss(&gateway, &step, &mut rng).await.unwrap();
         let ctx = SemiHonestContext::new(&prss, &gateway);
 

@@ -3,12 +3,15 @@ use std::{
     hash::Hash,
 };
 
-pub trait StepNarrow<S: Step + ?Sized> {
+pub trait StepNarrow {
     #[must_use]
-    fn narrow(&self, step: &S) -> Self;
+    fn narrow<S: Step + ?Sized>(&self, step: &S) -> Self;
 }
 
-pub trait Gate: Default + Send + Sync + Clone + PartialEq + Eq + Hash + Debug {}
+pub trait Gate:
+    StepNarrow + AsRef<str> + Default + Send + Sync + Clone + PartialEq + Eq + Hash + Debug
+{
+}
 
 /// Defines a unique step of the IPA protocol at a given level of implementation.
 ///
@@ -69,12 +72,12 @@ impl Display for Descriptive {
     }
 }
 
-impl<S: Step + ?Sized> StepNarrow<S> for Descriptive {
+impl StepNarrow for Descriptive {
     /// Narrow the scope of the step identifier.
     /// # Panics
     /// In a debug build, this checks that the same refine call isn't run twice and that the string
     /// value of the step doesn't include '/' (which would lead to a bad outcome).
-    fn narrow(&self, step: &S) -> Self {
+    fn narrow<S: Step + ?Sized>(&self, step: &S) -> Self {
         #[cfg(debug_assertions)]
         {
             let s = String::from(step.as_ref());

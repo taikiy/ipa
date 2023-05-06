@@ -27,12 +27,12 @@ impl Runner {
     ) -> Box<dyn ProtocolResult> {
         match field {
             FieldType::Fp31 => Box::new(
-                self.run_internal::<Fp31, MatchKey, BreakdownKey>(ctx, input)
+                self.run_internal::<G, Fp31, MatchKey, BreakdownKey>(ctx, input)
                     .await
                     .expect("IPA query failed"),
             ),
             FieldType::Fp32BitPrime => Box::new(
-                self.run_internal::<Fp32BitPrime, MatchKey, BreakdownKey>(ctx, input)
+                self.run_internal::<G, Fp32BitPrime, MatchKey, BreakdownKey>(ctx, input)
                     .await
                     .expect("IPA query failed"),
             ),

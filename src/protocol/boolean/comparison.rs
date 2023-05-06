@@ -329,8 +329,7 @@ mod tests {
     use crate::{
         ff::{Field, Fp31, Fp32BitPrime, PrimeField},
         protocol::{
-            boolean::random_bits_generator::RandomBitsGenerator, context::Context, step::Gate,
-            RecordId,
+            boolean::random_bits_generator::RandomBitsGenerator, context::Context, RecordId,
         },
         rand::thread_rng,
         secret_sharing::{replicated::malicious::ExtendableField, SharedValue},
