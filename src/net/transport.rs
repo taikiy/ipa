@@ -6,7 +6,7 @@ use crate::{
         StepBinding, StreamCollection, Transport, TransportCallbacks,
     },
     net::{client::MpcHelperClient, error::Error, MpcHelperServer},
-    protocol::{step, QueryId},
+    protocol::{step::GateImpl, QueryId},
     sync::Arc,
 };
 use async_trait::async_trait;
@@ -71,7 +71,7 @@ impl HttpTransport {
     pub fn receive_stream(
         self: Arc<Self>,
         query_id: QueryId,
-        step: step::Descriptive,
+        step: GateImpl,
         from: HelperIdentity,
         stream: BodyStream,
     ) {
@@ -102,7 +102,7 @@ impl Transport for Arc<HttpTransport> {
     ) -> Result<(), Error>
     where
         Option<QueryId>: From<Q>,
-        Option<step::Descriptive>: From<S>,
+        Option<GateImpl>: From<S>,
     {
         let route_id = route.resource_identifier();
         match route_id {
@@ -110,7 +110,7 @@ impl Transport for Arc<HttpTransport> {
                 // TODO(600): These fallible extractions aren't really necessary.
                 let query_id = <Option<QueryId>>::from(route.query_id())
                     .expect("query_id required when sending records");
-                let step = <Option<step::Descriptive>>::from(route.step())
+                let step = <Option<GateImpl>>::from(route.step())
                     .expect("step required when sending records");
                 let resp_future = self.clients[dest].step(self.identity, query_id, &step, data)?;
                 tokio::spawn(async move {
@@ -135,7 +135,7 @@ impl Transport for Arc<HttpTransport> {
         }
     }
 
-    fn receive<R: RouteParams<NoResourceIdentifier, QueryId, step::Descriptive>>(
+    fn receive<R: RouteParams<NoResourceIdentifier, QueryId, GateImpl>>(
         &self,
         from: HelperIdentity,
         route: R,
@@ -169,7 +169,7 @@ mod e2e_tests {
     use tokio_stream::wrappers::ReceiverStream;
     use typenum::Unsigned;
 
-    static STEP: Lazy<step::Descriptive> = Lazy::new(|| step::Descriptive::from("http-transport"));
+    static STEP: Lazy<GateImpl> = Lazy::new(|| GateImpl::from("http-transport"));
 
     #[tokio::test]
     async fn receive_stream() {

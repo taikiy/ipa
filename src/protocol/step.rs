@@ -13,6 +13,8 @@ pub trait Gate:
 {
 }
 
+pub type GateImpl = Descriptive;
+
 /// Defines a unique step of the IPA protocol at a given level of implementation.
 ///
 /// Any stage of the protocol execution will involve multiple steps.  Each of these steps
