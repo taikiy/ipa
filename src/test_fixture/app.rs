@@ -5,6 +5,7 @@ use crate::{
         query::{QueryConfig, QueryInput},
         ByteArrStream,
     },
+    protocol::step::Gate,
     secret_sharing::IntoShares,
     AppSetup, HelperApp,
 };
@@ -45,9 +46,9 @@ where
 ///
 /// [`InMemoryNetwork`]: crate::test_fixture::network::InMemoryNetwork
 /// [`TestWorld`]: crate::test_fixture::TestWorld
-pub struct TestApp {
-    drivers: [HelperApp; 3],
-    _network: InMemoryNetwork,
+pub struct TestApp<G: Gate> {
+    drivers: [HelperApp<G>; 3],
+    _network: InMemoryNetwork<G>,
 }
 
 fn unzip_tuple_array<T, U>(input: [(T, U); 3]) -> ([T; 3], [U; 3]) {
@@ -55,7 +56,7 @@ fn unzip_tuple_array<T, U>(input: [(T, U); 3]) -> ([T; 3], [U; 3]) {
     ([v0.0, v1.0, v2.0], [v0.1, v1.1, v2.1])
 }
 
-impl Default for TestApp {
+impl<G: Gate> Default for TestApp<G> {
     fn default() -> Self {
         let (setup, callbacks) =
             unzip_tuple_array([AppSetup::new(), AppSetup::new(), AppSetup::new()]);
@@ -65,7 +66,7 @@ impl Default for TestApp {
             .transports()
             .iter()
             .zip(setup)
-            .map(|(t, s)| s.connect(<InMemoryTransport as Clone>::clone(t)))
+            .map(|(t, s)| s.connect(<InMemoryTransport<G> as Clone>::clone(t)))
             .collect::<Vec<_>>()
             .try_into()
             .map_err(|_| "infallible")
@@ -78,7 +79,7 @@ impl Default for TestApp {
     }
 }
 
-impl TestApp {
+impl<G: Gate> TestApp<G> {
     /// Initiates a new query on all helpers and drives it to completion.
     ///
     /// ## Errors

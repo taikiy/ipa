@@ -8,7 +8,7 @@ use crate::{
         },
         malicious::MaliciousValidator,
         prss::Endpoint as PrssEndpoint,
-        step::{GateImpl, Step},
+        step::{self, Gate, Step},
         QueryId,
     },
     rand::thread_rng,
@@ -35,11 +35,11 @@ use tracing::{Instrument, Level};
 /// there is no need to associate each of them with `QueryId`, but this API makes it possible
 /// to do if we need it.
 pub struct TestWorld {
-    gateways: [Gateway<GateImpl>; 3],
+    gateways: [Gateway<step::Descriptive>; 3],
     participants: [PrssEndpoint; 3],
     executions: AtomicUsize,
     metrics_handle: MetricsHandle,
-    _network: InMemoryNetwork,
+    _network: InMemoryNetwork<step::Descriptive>,
 }
 
 #[derive(Clone)]
@@ -133,7 +133,7 @@ impl TestWorld {
     /// # Panics
     /// Panics if world has more or less than 3 gateways/participants
     #[must_use]
-    pub fn contexts(&self) -> [SemiHonestContext<'_, GateImpl>; 3] {
+    pub fn contexts(&self) -> [SemiHonestContext<'_, step::Descriptive>; 3] {
         let execution = self.executions.fetch_add(1, Ordering::Release);
         zip(&self.participants, &self.gateways)
             .map(|(participant, gateway)| {
@@ -155,7 +155,7 @@ impl TestWorld {
         format!("run-{execution}")
     }
 
-    pub fn gateway(&self, role: Role) -> &Gateway<GateImpl> {
+    pub fn gateway(&self, role: Role) -> &Gateway<step::Descriptive> {
         &self.gateways[role]
     }
 }
@@ -171,12 +171,14 @@ impl Drop for TestWorld {
 
 #[async_trait]
 pub trait Runner {
+    type TestGate: Gate;
+
     async fn semi_honest<'a, I, A, O, H, R>(&'a self, input: I, helper_fn: H) -> [O; 3]
     where
         I: IntoShares<A> + Send + 'static,
         A: Send,
         O: Send + Debug,
-        H: Fn(SemiHonestContext<'a, GateImpl>, A) -> R + Send + Sync,
+        H: Fn(SemiHonestContext<'a, Self::TestGate>, A) -> R + Send + Sync,
         R: Future<Output = O> + Send;
 
     async fn malicious<'a, F, I, A, O, M, H, R, P>(&'a self, input: I, helper_fn: H) -> [O; 3]
@@ -184,10 +186,10 @@ pub trait Runner {
         F: Field + ExtendableField,
         I: IntoShares<A> + Send + 'static,
         A: Send,
-        for<'u> UpgradeContext<'u, F, GateImpl>: UpgradeToMalicious<A, M>,
+        for<'u> UpgradeContext<'u, F, Self::TestGate>: UpgradeToMalicious<A, M>,
         O: Send + Debug,
         M: Send,
-        H: Fn(MaliciousContext<'a, F, GateImpl>, M) -> R + Send + Sync,
+        H: Fn(MaliciousContext<'a, F, Self::TestGate>, M) -> R + Send + Sync,
         R: Future<Output = P> + Send,
         P: DowngradeMalicious<Target = O> + Clone + Send + Debug,
         [P; 3]: ValidateMalicious<F>,
@@ -203,12 +205,14 @@ fn split_array_of_tuples<T, U, V>(v: [(T, U, V); 3]) -> ([T; 3], [U; 3], [V; 3])
 
 #[async_trait]
 impl Runner for TestWorld {
+    type TestGate = step::Descriptive;
+
     async fn semi_honest<'a, I, A, O, H, R>(&'a self, input: I, helper_fn: H) -> [O; 3]
     where
         I: IntoShares<A> + Send + 'static,
         A: Send,
         O: Send + Debug,
-        H: Fn(SemiHonestContext<'a, GateImpl>, A) -> R + Send + Sync,
+        H: Fn(SemiHonestContext<'a, Self::TestGate>, A) -> R + Send + Sync,
         R: Future<Output = O> + Send,
     {
         let contexts = self.contexts();
@@ -226,10 +230,10 @@ impl Runner for TestWorld {
         F: Field + ExtendableField,
         I: IntoShares<A> + Send + 'static,
         A: Send,
-        for<'u> UpgradeContext<'u, F, GateImpl>: UpgradeToMalicious<A, M>,
+        for<'u> UpgradeContext<'u, F, Self::TestGate>: UpgradeToMalicious<A, M>,
         O: Send + Debug,
         M: Send,
-        H: Fn(MaliciousContext<'a, F, GateImpl>, M) -> R + Send + Sync,
+        H: Fn(MaliciousContext<'a, F, Self::TestGate>, M) -> R + Send + Sync,
         R: Future<Output = P> + Send,
         P: DowngradeMalicious<Target = O> + Clone + Send + Debug,
         [P; 3]: ValidateMalicious<F>,

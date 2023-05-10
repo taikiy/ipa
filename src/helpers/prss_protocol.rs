@@ -25,7 +25,7 @@ impl Step for PrssExchangeStep {}
 /// establish the prss endpoint by exchanging public keys with the other helpers
 /// # Errors
 /// if communication with other helpers fails
-pub async fn negotiate<T: Transport, R: RngCore + CryptoRng, G: Gate>(
+pub async fn negotiate<T: Transport<G>, R: RngCore + CryptoRng, G: Gate>(
     gateway: &Gateway<G, T>,
     step: &G,
     rng: &mut R,

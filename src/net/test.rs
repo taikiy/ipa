@@ -2,6 +2,7 @@ use crate::{
     config::NetworkConfig,
     helpers::{HelperIdentity, TransportCallbacks},
     net::{BindTarget, HttpTransport, MpcHelperClient, MpcHelperServer},
+    protocol::step::Gate,
     sync::Arc,
     test_fixture::metrics::MetricsHandle,
 };
@@ -24,7 +25,7 @@ use tokio::task::JoinHandle;
 
 static DEFAULT_SERVER_URL: Lazy<Uri> = Lazy::new(|| "http://localhost:3000".parse().unwrap());
 
-type HttpTransportCallbacks = TransportCallbacks<Arc<HttpTransport>>;
+type HttpTransportCallbacks<G> = TransportCallbacks<Arc<HttpTransport<G>>>;
 
 pub async fn body_stream(
     stream: Box<dyn Stream<Item = Result<Bytes, Box<dyn StdError + Send + Sync>>> + Send>,
@@ -39,32 +40,32 @@ pub async fn body_stream(
     .unwrap()
 }
 
-pub struct TestServer {
+pub struct TestServer<G: Gate> {
     pub addr: SocketAddr,
     pub handle: JoinHandle<()>,
-    pub transport: Arc<HttpTransport>,
-    pub server: MpcHelperServer,
+    pub transport: Arc<HttpTransport<G>>,
+    pub server: MpcHelperServer<G>,
     pub client: MpcHelperClient,
 }
 
-impl TestServer {
+impl<G: Gate> TestServer<G> {
     /// Build default set of test clients
     ///
     /// All three clients will be configured with the same default server URL, thus,
     /// at most one client will do anything useful.
-    pub async fn default() -> TestServer {
+    pub async fn default() -> TestServer<G> {
         Self::builder().build().await
     }
 
     /// Return a test client builder
-    pub fn builder() -> TestServerBuilder {
+    pub fn builder() -> TestServerBuilder<G> {
         TestServerBuilder::default()
     }
 }
 
 #[derive(Default)]
-pub struct TestServerBuilder {
-    callbacks: Option<HttpTransportCallbacks>,
+pub struct TestServerBuilder<G: Gate> {
+    callbacks: Option<HttpTransportCallbacks<G>>,
     metrics: Option<MetricsHandle>,
     https: bool,
 }
@@ -91,8 +92,8 @@ fn https_client(addr: SocketAddr) -> MpcHelperClient {
     MpcHelperClient::new_with_connector(uri, https)
 }
 
-impl TestServerBuilder {
-    pub fn with_callbacks(mut self, callbacks: HttpTransportCallbacks) -> Self {
+impl<G: Gate> TestServerBuilder<G> {
+    pub fn with_callbacks(mut self, callbacks: HttpTransportCallbacks<G>) -> Self {
         self.callbacks = Some(callbacks);
         self
     }
@@ -109,7 +110,7 @@ impl TestServerBuilder {
         self
     }
 
-    pub async fn build(self) -> TestServer {
+    pub async fn build(self) -> TestServer<G> {
         let clients = TestClients::default();
         let (transport, server) = HttpTransport::new(
             HelperIdentity::ONE,

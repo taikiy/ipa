@@ -4,7 +4,10 @@ use crate::{
         transport::{ByteArrStream, NoQueryId, NoStep},
         RoleAssignment, RouteId, RouteParams,
     },
-    protocol::{step::Step, QueryId},
+    protocol::{
+        step::{Gate, Step},
+        QueryId,
+    },
     query::ProtocolResult,
 };
 use serde::{Deserialize, Serialize};
@@ -40,7 +43,7 @@ impl Default for QueryConfig {
     }
 }
 
-impl RouteParams<RouteId, NoQueryId, NoStep> for &QueryConfig {
+impl<G: Gate> RouteParams<RouteId, NoQueryId, NoStep, G> for &QueryConfig {
     type Params = String;
 
     fn resource_identifier(&self) -> RouteId {
@@ -66,7 +69,7 @@ impl RouteParams<RouteId, NoQueryId, NoStep> for &QueryConfig {
     }
 }
 
-impl RouteParams<RouteId, QueryId, NoStep> for &PrepareQuery {
+impl<G: Gate> RouteParams<RouteId, QueryId, NoStep, G> for &PrepareQuery {
     type Params = String;
 
     fn resource_identifier(&self) -> RouteId {

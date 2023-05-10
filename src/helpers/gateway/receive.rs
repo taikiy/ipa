@@ -7,23 +7,23 @@ use futures::Stream;
 use std::marker::PhantomData;
 
 /// Receiving end end of the gateway channel.
-pub struct ReceivingEnd<T: Transport, M: Message> {
-    unordered_rx: UR<T>,
-    _phantom: PhantomData<M>,
+pub struct ReceivingEnd<T: Transport<G>, G: Gate, M: Message> {
+    unordered_rx: UR<T, G>,
+    _phantom: PhantomData<(G, M)>,
 }
 
 /// Receiving channels, indexed by (role, step).
-pub(super) struct GatewayReceivers<T: Transport, G: Gate> {
-    inner: DashMap<ChannelId<G>, UR<T>>,
+pub(super) struct GatewayReceivers<T: Transport<G>, G: Gate> {
+    inner: DashMap<ChannelId<G>, UR<T, G>>,
 }
 
-pub(super) type UR<T> = UnorderedReceiver<
-    <T as Transport>::RecordsStream,
-    <<T as Transport>::RecordsStream as Stream>::Item,
+pub(super) type UR<T, G> = UnorderedReceiver<
+    <T as Transport<G>>::RecordsStream,
+    <<T as Transport<G>>::RecordsStream as Stream>::Item,
 >;
 
-impl<T: Transport, M: Message> ReceivingEnd<T, M> {
-    pub(super) fn new(rx: UR<T>) -> Self {
+impl<T: Transport<G>, G: Gate, M: Message> ReceivingEnd<T, G, M> {
+    pub(super) fn new(rx: UR<T, G>) -> Self {
         Self {
             unordered_rx: rx,
             _phantom: PhantomData,
@@ -46,7 +46,7 @@ impl<T: Transport, M: Message> ReceivingEnd<T, M> {
     }
 }
 
-impl<T: Transport, G: Gate> Default for GatewayReceivers<T, G> {
+impl<T: Transport<G>, G: Gate> Default for GatewayReceivers<T, G> {
     fn default() -> Self {
         Self {
             inner: DashMap::default(),
@@ -54,8 +54,12 @@ impl<T: Transport, G: Gate> Default for GatewayReceivers<T, G> {
     }
 }
 
-impl<T: Transport, G: Gate> GatewayReceivers<T, G> {
-    pub fn get_or_create<F: FnOnce() -> UR<T>>(&self, channel_id: &ChannelId<G>, ctr: F) -> UR<T> {
+impl<T: Transport<G>, G: Gate> GatewayReceivers<T, G> {
+    pub fn get_or_create<F: FnOnce() -> UR<T, G>>(
+        &self,
+        channel_id: &ChannelId<G>,
+        ctr: F,
+    ) -> UR<T, G> {
         let receivers = &self.inner;
         if let Some(recv) = receivers.get(channel_id) {
             recv.clone()

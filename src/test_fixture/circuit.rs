@@ -1,7 +1,7 @@
 use crate::{
     ff::{Field, Fp31},
     helpers::TotalRecords,
-    protocol::{basics::SecureMul, context::Context, RecordId},
+    protocol::{basics::SecureMul, context::Context, step::Gate, RecordId},
     rand::thread_rng,
     secret_sharing::{replicated::semi_honest::AdditiveShare as Replicated, IntoShares},
     test_fixture::{narrow_contexts, Reconstruct, TestWorld},

@@ -1,4 +1,7 @@
-use crate::helpers::transport::stream::{StreamCollection, StreamKey};
+use crate::{
+    helpers::transport::stream::{StreamCollection, StreamKey},
+    protocol::step::Gate,
+};
 use futures::Stream;
 use futures_util::StreamExt;
 use std::{
@@ -62,19 +65,19 @@ where
 /// If stream is not received yet, each poll generates a waker that is used internally to wake up
 /// the task when stream is received.
 /// Once stream is received, it is moved to this struct and it acts as a proxy to it.
-pub struct ReceiveRecords<S> {
-    inner: ReceiveRecordsInner<S>,
+pub struct ReceiveRecords<S, G> {
+    inner: ReceiveRecordsInner<S, G>,
 }
 
-impl<S> ReceiveRecords<S> {
-    pub(crate) fn new(key: StreamKey, coll: StreamCollection<S>) -> Self {
+impl<S, G> ReceiveRecords<S, G> {
+    pub(crate) fn new(key: StreamKey<G>, coll: StreamCollection<S, G>) -> Self {
         Self {
             inner: ReceiveRecordsInner::Pending(key, coll),
         }
     }
 }
 
-impl<S: Stream + Unpin> Stream for ReceiveRecords<S> {
+impl<S: Stream + Unpin, G: Gate> Stream for ReceiveRecords<S, G> {
     type Item = S::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -83,12 +86,12 @@ impl<S: Stream + Unpin> Stream for ReceiveRecords<S> {
 }
 
 /// Inner state for [`ReceiveRecords`] struct
-enum ReceiveRecordsInner<S> {
-    Pending(StreamKey, StreamCollection<S>),
+enum ReceiveRecordsInner<S, G> {
+    Pending(StreamKey<G>, StreamCollection<S, G>),
     Ready(S),
 }
 
-impl<S: Stream + Unpin> Stream for ReceiveRecordsInner<S> {
+impl<S: Stream + Unpin, G: Gate> Stream for ReceiveRecordsInner<S, G> {
     type Item = S::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

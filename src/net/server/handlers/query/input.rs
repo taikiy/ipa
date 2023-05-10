@@ -1,13 +1,14 @@
 use crate::{
     helpers::Transport,
     net::{http_serde, Error, HttpTransport},
+    protocol::step::Gate,
     sync::Arc,
 };
 use axum::{routing::post, Extension, Router};
 use hyper::StatusCode;
 
-async fn handler(
-    transport: Extension<Arc<HttpTransport>>,
+async fn handler<G: Gate>(
+    transport: Extension<Arc<HttpTransport<G>>>,
     req: http_serde::query::input::Request,
 ) -> Result<(), Error> {
     let transport = Transport::clone_ref(&*transport);
@@ -17,7 +18,7 @@ async fn handler(
         .map_err(|e| Error::application(StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
-pub fn router(transport: Arc<HttpTransport>) -> Router {
+pub fn router<G: Gate>(transport: Arc<HttpTransport<G>>) -> Router {
     Router::new()
         .route(http_serde::query::input::AXUM_PATH, post(handler))
         .layer(Extension(transport))

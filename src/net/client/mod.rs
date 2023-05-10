@@ -5,7 +5,7 @@ use crate::{
         HelperIdentity,
     },
     net::{http_serde, Error},
-    protocol::{step::GateImpl, QueryId},
+    protocol::{step::Gate, QueryId},
 };
 use axum::http::uri;
 use futures::{Stream, StreamExt};
@@ -163,11 +163,11 @@ impl MpcHelperClient {
     /// If the request has illegal arguments, or fails to deliver to helper
     /// # Panics
     /// If messages size > max u32 (unlikely)
-    pub fn step<S: Stream<Item = Vec<u8>> + Send + 'static>(
+    pub fn step<S: Stream<Item = Vec<u8>> + Send + 'static, G: Gate>(
         &self,
         origin: HelperIdentity,
         query_id: QueryId,
-        step: &GateImpl,
+        step: &G,
         data: S,
     ) -> Result<ResponseFuture, Error> {
         let body = hyper::Body::wrap_stream::<_, _, Error>(data.map(Ok));
@@ -207,7 +207,7 @@ pub(crate) mod tests {
             MESSAGE_PAYLOAD_SIZE_BYTES,
         },
         net::{test::TestServer, HttpTransport},
-        protocol::step::{GateImpl, StepNarrow},
+        protocol::step::{Descriptive, StepNarrow},
         query::ProtocolResult,
         secret_sharing::replicated::semi_honest::AdditiveShare as Replicated,
         sync::Arc,
@@ -256,7 +256,7 @@ pub(crate) mod tests {
     /// `https` can be compared.
     async fn test_query_command<ClientOut, ClientFut, ClientF>(
         clientf: ClientF,
-        server_cb: TransportCallbacks<Arc<HttpTransport>>,
+        server_cb: TransportCallbacks<Arc<HttpTransport<G>>>,
     ) -> ClientOut
     where
         ClientOut: Eq + Debug,
@@ -384,7 +384,7 @@ pub(crate) mod tests {
         } = TestServer::builder().build().await;
         let origin = HelperIdentity::ONE;
         let expected_query_id = QueryId;
-        let expected_step = GateImpl::default().narrow("test-step");
+        let expected_step = step::Descriptive::default().narrow("test-step");
         let expected_payload = vec![7u8; MESSAGE_PAYLOAD_SIZE_BYTES];
 
         let resp = client

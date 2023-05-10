@@ -3,13 +3,14 @@ use std::sync::Arc;
 use crate::{
     helpers::Transport,
     net::{http_serde, server::Error, HttpTransport},
+    protocol::step::Gate,
 };
 use axum::{routing::get, Extension, Router};
 use hyper::StatusCode;
 
 /// Handles the completion of the query by blocking the sender until query is completed.
-async fn handler(
-    transport: Extension<Arc<HttpTransport>>,
+async fn handler<G: Gate>(
+    transport: Extension<Arc<HttpTransport<G>>>,
     req: http_serde::query::results::Request,
 ) -> Result<Vec<u8>, Error> {
     // TODO: we may be able to stream the response
@@ -20,7 +21,7 @@ async fn handler(
     }
 }
 
-pub fn router(transport: Arc<HttpTransport>) -> Router {
+pub fn router<G: Gate>(transport: Arc<HttpTransport<G>>) -> Router {
     Router::new()
         .route(http_serde::query::results::AXUM_PATH, get(handler))
         .layer(Extension(transport))

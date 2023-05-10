@@ -4,7 +4,7 @@ mod prepare;
 mod results;
 mod step;
 
-use crate::{net::HttpTransport, sync::Arc};
+use crate::{net::HttpTransport, protocol::step::Gate, sync::Arc};
 use axum::Router;
 
 /// Construct router for IPA query web service
@@ -12,7 +12,7 @@ use axum::Router;
 /// In principle, this web service could be backed by either an HTTP-interconnected helper network or
 /// an in-memory helper network. These are the APIs used by external callers (report collectors) to
 /// examine attribution results.
-pub fn query_router(transport: Arc<HttpTransport>) -> Router {
+pub fn query_router<G: Gate>(transport: Arc<HttpTransport<G>>) -> Router {
     Router::new()
         .merge(create::router(Arc::clone(&transport)))
         .merge(input::router(Arc::clone(&transport)))
@@ -26,7 +26,7 @@ pub fn query_router(transport: Arc<HttpTransport>) -> Router {
 /// particular query, to coordinate servicing that query.
 //
 // It might make sense to split the query and h2h handlers into two modules.
-pub fn h2h_router(transport: Arc<HttpTransport>) -> Router {
+pub fn h2h_router<G: Gate>(transport: Arc<HttpTransport<G>>) -> Router {
     Router::new()
         .merge(prepare::router(Arc::clone(&transport)))
         .merge(step::router(transport))

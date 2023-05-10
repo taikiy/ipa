@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     net::{http_serde, HttpTransport},
+    protocol::step::Gate,
     query::PrepareQueryError,
 };
 use axum::{response::IntoResponse, routing::post, Extension, Router};
@@ -9,8 +10,8 @@ use hyper::StatusCode;
 
 /// Called by whichever peer helper is the leader for an individual query, to initiatialize
 /// processing of that query.
-async fn handler(
-    transport: Extension<Arc<HttpTransport>>,
+async fn handler<G: Gate>(
+    transport: Extension<Arc<HttpTransport<G>>>,
     req: http_serde::query::prepare::Request,
 ) -> Result<(), PrepareQueryError> {
     Arc::clone(&transport).prepare_query(req.data).await
@@ -22,7 +23,7 @@ impl IntoResponse for PrepareQueryError {
     }
 }
 
-pub fn router(transport: Arc<HttpTransport>) -> Router {
+pub fn router<G: Gate>(transport: Arc<HttpTransport<G>>) -> Router {
     Router::new()
         .route(http_serde::query::prepare::AXUM_PATH, post(handler))
         .layer(Extension(transport))

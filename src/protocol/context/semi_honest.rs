@@ -34,7 +34,7 @@ pub struct SemiHonestContext<'a, G: Gate> {
 }
 
 impl<'a, G: Gate> SemiHonestContext<'a, G> {
-    pub fn new(participant: &'a PrssEndpoint, gateway: &'a Gateway<G>) -> Self {
+    pub fn new(participant: &'a PrssEndpoint, gateway: &Gateway<G>) -> Self {
         Self::new_complete(
             participant,
             gateway,
@@ -45,7 +45,7 @@ impl<'a, G: Gate> SemiHonestContext<'a, G> {
 
     pub fn new_with_total_records(
         participant: &'a PrssEndpoint,
-        gateway: &'a Gateway<G>,
+        gateway: &Gateway<G>,
         total_records: TotalRecords,
     ) -> Self {
         Self::new_complete(participant, gateway, G::default(), total_records)
@@ -53,7 +53,7 @@ impl<'a, G: Gate> SemiHonestContext<'a, G> {
 
     pub(super) fn new_complete(
         participant: &'a PrssEndpoint,
-        gateway: &'a Gateway<G>,
+        gateway: &Gateway<G>,
         step: G,
         total_records: TotalRecords,
     ) -> Self {
@@ -128,13 +128,13 @@ impl<'a, G: Gate> Context<G> for SemiHonestContext<'a, G> {
         )
     }
 
-    fn send_channel<M: Message>(&self, role: Role) -> SendingEnd<M, G> {
+    fn send_channel<M: Message>(&self, role: Role) -> SendingEnd<G, M> {
         self.inner
             .gateway
             .get_sender(&ChannelId::new(role, self.step.clone()), self.total_records)
     }
 
-    fn recv_channel<M: Message>(&self, role: Role) -> ReceivingEnd<M> {
+    fn recv_channel<M: Message>(&self, role: Role) -> ReceivingEnd<G, M> {
         self.inner
             .gateway
             .get_receiver(&ChannelId::new(role, self.step.clone()))
@@ -159,7 +159,7 @@ pub(super) struct ContextInner<'a, G: Gate> {
 }
 
 impl<'a, G: Gate> ContextInner<'a, G> {
-    fn new(prss: &'a PrssEndpoint, gateway: &'a Gateway<G>) -> Arc<Self> {
+    fn new(prss: &'a PrssEndpoint, gateway: &Gateway<G>) -> Arc<Self> {
         Arc::new(Self { prss, gateway })
     }
 }

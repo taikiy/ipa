@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::{
     helpers::{
         buffers::UnorderedReceiver,
@@ -12,15 +14,16 @@ use crate::{
 ///
 /// [`HelperIdentity`]: crate::helpers::HelperIdentity
 #[derive(Clone)]
-pub(super) struct RoleResolvingTransport<T> {
+pub(super) struct RoleResolvingTransport<T: Transport<G>, G: Gate> {
     pub query_id: QueryId,
     pub roles: RoleAssignment,
     pub config: GatewayConfig,
     pub inner: T,
+    _marker: PhantomData<G>,
 }
 
-impl<T: Transport> RoleResolvingTransport<T> {
-    pub(crate) async fn send<G: Gate>(
+impl<T: Transport<G>, G: Gate> RoleResolvingTransport<T, G> {
+    pub(crate) async fn send(
         &self,
         channel_id: &ChannelId<G>,
         data: GatewaySendStream<G>,
@@ -41,7 +44,7 @@ impl<T: Transport> RoleResolvingTransport<T> {
             .await
     }
 
-    pub(crate) fn receive<G: Gate>(&self, channel_id: &ChannelId<G>) -> UR<T> {
+    pub(crate) fn receive(&self, channel_id: &ChannelId<G>) -> UR<T, G> {
         let peer = self.roles.identity(channel_id.role);
         assert_ne!(
             peer,

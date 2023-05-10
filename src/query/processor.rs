@@ -3,7 +3,10 @@ use crate::{
         query::{PrepareQuery, QueryConfig, QueryInput},
         Gateway, GatewayConfig, Role, RoleAssignment, Transport, TransportError, TransportImpl,
     },
-    protocol::{step::GateImpl, QueryId},
+    protocol::{
+        step::{Gate, GateImpl},
+        QueryId,
+    },
     query::{
         executor,
         state::{QueryState, QueryStatus, RunningQueries, StateError},
@@ -46,7 +49,7 @@ pub enum NewQueryError {
     #[error(transparent)]
     State(#[from] StateError),
     #[error(transparent)]
-    Transport(#[from] TransportError),
+    Transport(#[from] TransportError<GateImpl>),
     #[error(transparent)]
     OneshotRecv(#[from] oneshot::error::RecvError),
 }
@@ -105,9 +108,9 @@ impl Processor {
     /// ## Errors
     /// When other peers failed to acknowledge this query
     #[allow(clippy::missing_panics_doc)]
-    pub async fn new_query(
+    pub async fn new_query<G: Gate>(
         &self,
-        transport: TransportImpl,
+        transport: TransportImpl<G>,
         req: QueryConfig,
     ) -> Result<PrepareQuery, NewQueryError> {
         let query_id = QueryId;
@@ -147,9 +150,9 @@ impl Processor {
     ///
     /// ## Errors
     /// if query is already running or this helper cannot be a follower in it
-    pub fn prepare(
+    pub fn prepare<G: Gate>(
         &self,
-        transport: &TransportImpl,
+        transport: &TransportImpl<G>,
         req: PrepareQuery,
     ) -> Result<(), PrepareQueryError> {
         let my_role = req.roles.role(transport.identity());
@@ -178,9 +181,9 @@ impl Processor {
     ///
     /// ## Panics
     /// If failed to obtain an exclusive access to the query collection.
-    pub fn receive_inputs(
+    pub fn receive_inputs<G: Gate>(
         &self,
-        transport: TransportImpl,
+        transport: TransportImpl<G>,
         input: QueryInput,
     ) -> Result<(), QueryInputError> {
         let mut queries = self.queries.inner.lock().unwrap();
@@ -192,7 +195,7 @@ impl Processor {
                         input.query_id, query_id,
                         "received inputs for a different query"
                     );
-                    let gateway = Gateway::<GateImpl>::new(
+                    let gateway = Gateway::new(
                         query_id,
                         GatewayConfig::default(),
                         role_assignment,

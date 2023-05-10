@@ -1,21 +1,22 @@
 use crate::{
     helpers::Transport,
     net::{http_serde, server::Error, HttpTransport},
+    protocol::step::Gate,
     sync::Arc,
 };
 use axum::{extract::BodyStream, routing::post, Extension, Router};
 
 #[allow(clippy::unused_async)] // axum doesn't like synchronous handler
-async fn handler(
-    transport: Extension<Arc<HttpTransport>>,
-    req: http_serde::query::step::Request<BodyStream>,
+async fn handler<G: Gate>(
+    transport: Extension<Arc<HttpTransport<G>>>,
+    req: http_serde::query::step::Request<BodyStream, G>,
 ) -> Result<(), Error> {
     let transport = Transport::clone_ref(&*transport);
     transport.receive_stream(req.query_id, req.step, req.origin, req.body);
     Ok(())
 }
 
-pub fn router(transport: Arc<HttpTransport>) -> Router {
+pub fn router<G: Gate>(transport: Arc<HttpTransport<G>>) -> Router {
     Router::new()
         .route(http_serde::query::step::AXUM_PATH, post(handler))
         .layer(Extension(transport))
@@ -33,7 +34,7 @@ mod tests {
             test::{body_stream, TestServer},
         },
         protocol::{
-            step::{GateImpl, StepNarrow},
+            step::{self, Gate, StepNarrow},
             QueryId,
         },
     };
@@ -50,7 +51,7 @@ mod tests {
     async fn step() {
         let TestServer { transport, .. } = TestServer::builder().build().await;
 
-        let step = GateImpl::default().narrow("test");
+        let step = step::Descriptive::default().narrow("test");
         let payload = vec![213; DATA_LEN * MESSAGE_PAYLOAD_SIZE_BYTES];
         let req = http_serde::query::step::Request::new(
             HelperIdentity::TWO,
@@ -71,14 +72,14 @@ mod tests {
         );
     }
 
-    struct OverrideReq {
+    struct OverrideReq<G: Gate> {
         origin: u8,
         query_id: String,
-        step: GateImpl,
+        step: G,
         payload: Vec<u8>,
     }
 
-    impl IntoFailingReq for OverrideReq {
+    impl<G: Gate> IntoFailingReq for OverrideReq<G> {
         fn into_req(self, port: u16) -> Request<Body> {
             let uri = format!(
                 "http://localhost:{}{}/{}/step/{}",
@@ -94,12 +95,12 @@ mod tests {
         }
     }
 
-    impl Default for OverrideReq {
+    impl<G: Gate> Default for OverrideReq<G> {
         fn default() -> Self {
             Self {
                 origin: 1,
                 query_id: QueryId.as_ref().to_string(),
-                step: GateImpl::default().narrow("test"),
+                step: G::default().narrow("test"),
                 payload: vec![1; DATA_LEN * MESSAGE_PAYLOAD_SIZE_BYTES],
             }
         }

@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// Sending end of the gateway channel.
-pub struct SendingEnd<M: Message, G: Gate> {
+pub struct SendingEnd<G: Gate, M: Message> {
     sender_role: Role,
     channel_id: ChannelId<G>,
     inner: Arc<GatewaySender<G>>,
@@ -81,7 +81,7 @@ impl<G: Gate> GatewaySender<G> {
     }
 }
 
-impl<M: Message, G: Gate> SendingEnd<M, G> {
+impl<M: Message, G: Gate> SendingEnd<G, M> {
     pub(super) fn new(
         sender: Arc<GatewaySender<G>>,
         role: Role,

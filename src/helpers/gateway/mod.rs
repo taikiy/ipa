@@ -17,29 +17,29 @@ use crate::{
 };
 #[cfg(all(feature = "shuttle", test))]
 use shuttle::future as tokio;
-use std::{fmt::Debug, num::NonZeroUsize};
+use std::{fmt::Debug, marker::PhantomData, num::NonZeroUsize};
 
 /// Alias for the currently configured transport.
 ///
 /// To avoid proliferation of type parameters, most code references this concrete type alias, rather
 /// than a type parameter `T: Transport`.
 #[cfg(feature = "in-memory-infra")]
-pub type TransportImpl = super::transport::InMemoryTransport;
+pub type TransportImpl<G> = super::transport::InMemoryTransport<G>;
 
 #[cfg(feature = "real-world-infra")]
-pub type TransportImpl = crate::sync::Arc<crate::net::HttpTransport>;
+pub type TransportImpl<G> = crate::sync::Arc<crate::net::HttpTransport>;
 
-pub type TransportError = <TransportImpl as Transport>::Error;
-pub type ReceivingEnd<M> = ReceivingEndBase<TransportImpl, M>;
+pub type TransportError<G> = <TransportImpl<G> as Transport<G>>::Error;
+pub type ReceivingEnd<G, M> = ReceivingEndBase<TransportImpl<G>, G, M>;
 
 /// Gateway into IPA Infrastructure systems. This object allows sending and receiving messages.
 /// As it is generic over network/transport layer implementation, type alias [`Gateway`] should be
 /// used to avoid carrying `T` over.
 ///
 /// [`Gateway`]: crate::helpers::Gateway
-pub struct Gateway<G: Gate, T: Transport = TransportImpl> {
+pub struct Gateway<G: Gate, T: Transport<G> = TransportImpl<G>> {
     config: GatewayConfig,
-    transport: RoleResolvingTransport<T>,
+    transport: RoleResolvingTransport<T, G>,
     senders: GatewaySenders<G>,
     receivers: GatewayReceivers<T, G>,
 }
@@ -51,7 +51,7 @@ pub struct GatewayConfig {
     active: NonZeroUsize,
 }
 
-impl<G: Gate, T: Transport> Gateway<G, T> {
+impl<G: Gate, T: Transport<G>> Gateway<G, T> {
     #[must_use]
     pub fn new(
         query_id: QueryId,
@@ -66,6 +66,7 @@ impl<G: Gate, T: Transport> Gateway<G, T> {
                 roles,
                 inner: transport,
                 config,
+                _marker: PhantomData,
             },
             senders: GatewaySenders::default(),
             receivers: GatewayReceivers::default(),
@@ -87,7 +88,7 @@ impl<G: Gate, T: Transport> Gateway<G, T> {
         &self,
         channel_id: &ChannelId<G>,
         total_records: TotalRecords,
-    ) -> SendingEnd<M, G> {
+    ) -> SendingEnd<G, M> {
         let (tx, maybe_stream) =
             self.senders
                 .get_or_create::<M>(channel_id, self.config.active_work(), total_records);
@@ -109,7 +110,7 @@ impl<G: Gate, T: Transport> Gateway<G, T> {
     }
 
     #[must_use]
-    pub fn get_receiver<M: Message>(&self, channel_id: &ChannelId<G>) -> ReceivingEndBase<T, M> {
+    pub fn get_receiver<M: Message>(&self, channel_id: &ChannelId<G>) -> ReceivingEndBase<T, G, M> {
         ReceivingEndBase::new(
             self.receivers
                 .get_or_create(channel_id, || self.transport.receive(channel_id)),
@@ -160,7 +161,7 @@ mod tests {
     /// Gateway must be able to deal with it.
     #[tokio::test]
     async fn can_handle_heterogeneous_channels() {
-        async fn send<F: Field, G: Gate>(channel: &SendingEnd<F, G>, i: usize) {
+        async fn send<G: Gate, F: Field>(channel: &SendingEnd<G, F>, i: usize) {
             channel
                 .send(i.into(), F::truncate_from(u128::try_from(i).unwrap()))
                 .await

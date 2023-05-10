@@ -3,11 +3,12 @@ mod query;
 
 use crate::{
     net::{http_serde, HttpTransport},
+    protocol::step::Gate,
     sync::Arc,
 };
 use axum::Router;
 
-pub fn router(transport: Arc<HttpTransport>) -> Router {
+pub fn router<G: Gate>(transport: Arc<HttpTransport<G>>) -> Router {
     echo::router().nest(
         http_serde::query::BASE_AXUM_PATH,
         Router::new()

@@ -62,8 +62,8 @@ pub trait Context<G: Gate>: Clone + Send + Sync + SeqJoin {
         InstrumentedSequentialSharedRandomness<G>,
     );
 
-    fn send_channel<M: Message>(&self, role: Role) -> SendingEnd<M, G>;
-    fn recv_channel<M: Message>(&self, role: Role) -> ReceivingEnd<M>;
+    fn send_channel<M: Message>(&self, role: Role) -> SendingEnd<G, M>;
+    fn recv_channel<M: Message>(&self, role: Role) -> ReceivingEnd<G, M>;
 }
 
 #[cfg(all(test, not(feature = "shuttle"), feature = "in-memory-infra"))]
@@ -74,7 +74,7 @@ mod tests {
         protocol::{
             malicious::{MaliciousValidator, Step::MaliciousProtocol},
             prss::SharedRandomness,
-            step::{GateImpl, StepNarrow},
+            step::{self, StepNarrow},
             RecordId,
         },
         secret_sharing::replicated::{
@@ -194,7 +194,7 @@ mod tests {
 
         let input_size = input.len();
         let snapshot = world.metrics_snapshot();
-        let metrics_step = GateImpl::default()
+        let metrics_step = step::Descriptive::default()
             .narrow(&TestWorld::execution_step(0))
             .narrow("metrics");
 
@@ -251,7 +251,7 @@ mod tests {
             })
             .await;
 
-        let metrics_step = GateImpl::default()
+        let metrics_step = step::Descriptive::default()
             .narrow(&TestWorld::execution_step(0))
             // TODO: leaky abstraction, test world should tell us the exact step
             .narrow(&MaliciousProtocol)

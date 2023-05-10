@@ -9,7 +9,7 @@ pub trait StepNarrow {
 }
 
 pub trait Gate:
-    StepNarrow + AsRef<str> + Default + Send + Sync + Clone + PartialEq + Eq + Hash + Debug
+    StepNarrow + AsRef<str> + Default + Send + Sync + Clone + PartialEq + Eq + Hash + Debug + 'static
 {
 }
 

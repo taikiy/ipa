@@ -1,6 +1,6 @@
 use crate::{
     helpers::HelperIdentity,
-    protocol::{step::GateImpl, QueryId},
+    protocol::{step::Gate, QueryId},
     sync::{Arc, Mutex},
 };
 use futures::Stream;
@@ -12,7 +12,7 @@ use std::{
 
 /// Each stream is indexed by query id, the identity of helper where stream is originated from
 /// and step.
-pub type StreamKey = (QueryId, HelperIdentity, GateImpl);
+pub type StreamKey<G: Gate> = (QueryId, HelperIdentity, G);
 
 /// Thread-safe append-only collection of homogeneous record streams.
 /// Streams are indexed by [`StreamKey`] and the lifecycle of each stream is described by the
@@ -20,11 +20,11 @@ pub type StreamKey = (QueryId, HelperIdentity, GateImpl);
 ///
 /// Each stream can be inserted and taken away exactly once, any deviation from this behaviour will
 /// result in panic.
-pub struct StreamCollection<S> {
-    inner: Arc<Mutex<HashMap<StreamKey, RecordsStream<S>>>>,
+pub struct StreamCollection<S, G> {
+    inner: Arc<Mutex<HashMap<StreamKey<G>, RecordsStream<S>>>>,
 }
 
-impl<S> Default for StreamCollection<S> {
+impl<S, G> Default for StreamCollection<S, G> {
     fn default() -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::default())),
@@ -32,7 +32,7 @@ impl<S> Default for StreamCollection<S> {
     }
 }
 
-impl<S> Clone for StreamCollection<S> {
+impl<S, G> Clone for StreamCollection<S, G> {
     fn clone(&self) -> Self {
         Self {
             inner: Arc::clone(&self.inner),
@@ -40,12 +40,12 @@ impl<S> Clone for StreamCollection<S> {
     }
 }
 
-impl<S: Stream> StreamCollection<S> {
+impl<S: Stream, G: Gate> StreamCollection<S, G> {
     /// Adds a new stream associated with the given key.
     ///
     /// ## Panics
     /// If there was another stream associated with the same key some time in the past.
-    pub fn add_stream(&self, key: StreamKey, stream: S) {
+    pub fn add_stream(&self, key: StreamKey<G>, stream: S) {
         let mut streams = self.inner.lock().unwrap();
         match streams.entry(key) {
             Entry::Occupied(mut entry) => match entry.get_mut() {
@@ -73,7 +73,7 @@ impl<S: Stream> StreamCollection<S> {
     ///
     /// ## Panics
     /// If [`Waker`] that exists already inside this collection will not wake the given one.
-    pub fn add_waker(&self, key: &StreamKey, waker: &Waker) -> Option<S> {
+    pub fn add_waker(&self, key: &StreamKey<G>, waker: &Waker) -> Option<S> {
         let mut streams = self.inner.lock().unwrap();
 
         match streams.entry(key.clone()) {

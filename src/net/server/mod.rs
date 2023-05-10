@@ -4,6 +4,7 @@ use hyper::{server::conn::AddrStream, Request};
 
 use crate::{
     net::{Error, HttpTransport},
+    protocol::step::Gate,
     sync::Arc,
     task::JoinHandle,
     telemetry::metrics::{web::RequestProtocolVersion, REQUESTS_RECEIVED},
@@ -55,12 +56,12 @@ pub enum BindTarget {
 /// IPA helper web service
 ///
 /// `MpcHelperServer` handles requests from both peer helpers and external clients.
-pub struct MpcHelperServer {
-    transport: Arc<HttpTransport>,
+pub struct MpcHelperServer<G> {
+    transport: Arc<HttpTransport<G>>,
 }
 
-impl MpcHelperServer {
-    pub fn new(transport: Arc<HttpTransport>) -> Self {
+impl<G: Gate> MpcHelperServer<G> {
+    pub fn new(transport: Arc<HttpTransport<G>>) -> Self {
         MpcHelperServer { transport }
     }
 

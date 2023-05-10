@@ -1,6 +1,7 @@
 use crate::{
     helpers::Transport,
     net::{http_serde, Error, HttpTransport},
+    protocol::step::Gate,
     query::NewQueryError,
     sync::Arc,
 };
@@ -9,8 +10,8 @@ use hyper::StatusCode;
 
 /// Takes details from the HTTP request and creates a `[TransportCommand]::CreateQuery` that is sent
 /// to the [`HttpTransport`].
-async fn handler(
-    transport: Extension<Arc<HttpTransport>>,
+async fn handler<G: Gate>(
+    transport: Extension<Arc<HttpTransport<G>>>,
     req: http_serde::query::create::Request,
 ) -> Result<Json<http_serde::query::create::ResponseBody>, Error> {
     let transport = Transport::clone_ref(&*transport);
@@ -23,7 +24,7 @@ async fn handler(
     }
 }
 
-pub fn router(transport: Arc<HttpTransport>) -> Router {
+pub fn router<G: Gate>(transport: Arc<HttpTransport<G>>) -> Router {
     Router::new()
         .route(http_serde::query::create::AXUM_PATH, post(handler))
         .layer(Extension(transport))

@@ -450,7 +450,7 @@ pub mod query {
                 http_serde::query::{OriginHeader, BASE_AXUM_PATH},
                 Error,
             },
-            protocol::{step::GateImpl, QueryId},
+            protocol::{step::Gate, QueryId},
         };
         use async_trait::async_trait;
         use axum::{
@@ -461,15 +461,15 @@ pub mod query {
         // When this type is used on the client side, `B` is `hyper::Body`. When this type
         // is used on the server side, `B` can be any body type supported by axum.
         #[derive(Debug)]
-        pub struct Request<B> {
+        pub struct Request<B, G> {
             pub origin: HelperIdentity,
             pub query_id: QueryId,
-            pub step: GateImpl,
+            pub step: G,
             pub body: B,
         }
 
-        impl<B> Request<B> {
-            pub fn new(origin: HelperIdentity, query_id: QueryId, step: GateImpl, body: B) -> Self {
+        impl<B, G> Request<B, G> {
+            pub fn new(origin: HelperIdentity, query_id: QueryId, step: G, body: B) -> Self {
                 Self {
                     origin,
                     query_id,
@@ -480,7 +480,7 @@ pub mod query {
         }
 
         /// Convert to hyper request. Used on client side.
-        impl Request<hyper::Body> {
+        impl<G: Gate> Request<hyper::Body, G> {
             pub fn try_into_http_request(
                 self,
                 scheme: uri::Scheme,
@@ -509,9 +509,10 @@ pub mod query {
 
         /// Convert from axum request. Used on server side.
         #[async_trait]
-        impl<B> FromRequest<B> for Request<BodyStream>
+        impl<B, G> FromRequest<B> for Request<BodyStream, G>
         where
             B: Send,
+            G: Gate,
             BodyStream: FromRequest<B>,
             Error: From<<BodyStream as FromRequest<B>>::Rejection>,
         {

@@ -237,13 +237,13 @@ impl<'a, F: Field + ExtendableField, G: Gate> Context<G> for MaliciousContext<'a
         )
     }
 
-    fn send_channel<M: Message>(&self, role: Role) -> SendingEnd<M, G> {
+    fn send_channel<M: Message>(&self, role: Role) -> SendingEnd<G, M> {
         self.inner
             .gateway
             .get_sender(&ChannelId::new(role, self.step.clone()), self.total_records)
     }
 
-    fn recv_channel<M: Message>(&self, role: Role) -> ReceivingEnd<M> {
+    fn recv_channel<M: Message>(&self, role: Role) -> ReceivingEnd<G, M> {
         self.inner
             .gateway
             .get_receiver(&ChannelId::new(role, self.step.clone()))
