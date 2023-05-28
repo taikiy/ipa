@@ -206,16 +206,26 @@ where
         let new_credit_ctx = depth_i_ctx
             .narrow(&Step::CurrentStopBitTimesSuccessorCredit)
             .set_total_records(end);
-        let credit_or_ctx = depth_i_ctx
-            .narrow(&Step::CurrentCreditOrCreditUpdate)
-            .set_total_records(end);
-        let new_stop_bit_ctx = depth_i_ctx
-            .narrow(&Step::CurrentStopBitTimesSuccessorStopBit)
-            .set_total_records(next_end);
+        // do not narrow unless we actually need to execute multiplication
+        let credit_or_ctx = if first_iteration && should_add_on_first_iteration {
+            depth_i_ctx.clone()
+        } else {
+            depth_i_ctx
+                .narrow(&Step::CurrentCreditOrCreditUpdate)
+                .set_total_records(end)
+        };
+        let mut new_stop_bit_ctx = depth_i_ctx.clone();
         let mut credit_update_futures = Vec::with_capacity(end);
         let mut stop_bit_futures = Vec::with_capacity(end);
 
         for i in 0..end {
+            // do not narrow unless we actually need to execute multiplication
+            if i < next_end && i == 0 {
+                new_stop_bit_ctx = depth_i_ctx
+                    .narrow(&Step::CurrentStopBitTimesSuccessorStopBit)
+                    .set_total_records(next_end);
+            }
+
             let c1 = new_credit_ctx.clone();
             let c2 = new_stop_bit_ctx.clone();
             let c3 = credit_or_ctx.clone();
@@ -301,13 +311,18 @@ where
         let new_value_ctx = depth_i_ctx
             .narrow(&Step::CurrentStopBitTimesSuccessorCredit)
             .set_total_records(end);
-        let new_stop_bit_ctx = depth_i_ctx
-            .narrow(&Step::CurrentStopBitTimesSuccessorStopBit)
-            .set_total_records(next_end);
+        let mut new_stop_bit_ctx = depth_i_ctx.clone();
         let mut value_update_futures = Vec::with_capacity(end);
         let mut stop_bit_futures = Vec::with_capacity(end);
 
         for i in 0..end {
+            // do not narrow unless we actually need to execute multiplication
+            if i < next_end && i == 0 {
+                new_stop_bit_ctx = depth_i_ctx
+                    .narrow(&Step::CurrentStopBitTimesSuccessorStopBit)
+                    .set_total_records(next_end);
+            }
+
             let c1 = new_value_ctx.clone();
             let c2 = new_stop_bit_ctx.clone();
             let record_id = RecordId::from(i);
@@ -421,7 +436,7 @@ async fn mod_conv_helper_bits<C: Context, F: Field>(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[allow(clippy::enum_variant_names)]
-enum Step {
+pub(in crate::protocol) enum Step {
     CurrentStopBitTimesSuccessorCredit,
     CurrentStopBitTimesSuccessorStopBit,
     CurrentCreditOrCreditUpdate,
@@ -447,7 +462,7 @@ impl AsRef<str> for Step {
     }
 }
 
-struct InteractionPatternStep(usize);
+pub(crate) struct InteractionPatternStep(usize);
 
 impl crate::protocol::step::Step for InteractionPatternStep {}
 

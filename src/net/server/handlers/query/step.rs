@@ -62,7 +62,7 @@ mod tests {
         let payload = vec![213; DATA_LEN * MESSAGE_PAYLOAD_SIZE_BYTES];
         let req = http_serde::query::step::Request::new(
             QueryId,
-            step.clone(),
+            step.clone().into(),
             body_stream(Box::new(once(ready(Ok(payload.clone().into()))))).await,
         );
 
@@ -74,7 +74,8 @@ mod tests {
         .await
         .unwrap();
 
-        let mut stream = Arc::clone(&transport).receive(HelperIdentity::TWO, (QueryId, step));
+        let mut stream =
+            Arc::clone(&transport).receive(HelperIdentity::TWO, (QueryId, step.into()));
 
         assert_eq!(
             poll_immediate(&mut stream).next().await,

@@ -38,7 +38,7 @@ use std::iter::{repeat, zip};
 ///! we know the secret-shared values are all either 0, or 1. As such, the XOR operation
 ///! is equivalent to fn xor(a, b) { a + b - 2*a*b }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum Step {
+pub(crate) enum Step {
     Xor1,
     Xor2,
 }

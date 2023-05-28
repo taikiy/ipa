@@ -6,7 +6,7 @@ edition = "2021"
 
 [features]
 # by default remove all TRACE, DEBUG spans from release builds
-default = ["web-app", "in-memory-infra", "tracing/max_level_trace", "tracing/release_max_level_info"]
+default = ["web-app", "in-memory-infra", "tracing/max_level_trace", "tracing/release_max_level_info", "descriptive-gates"]
 cli = ["comfy-table", "clap"]
 enable-serde = ["serde", "serde_json"]
 protocol-perf-testing = ["no-prss"]
@@ -35,9 +35,14 @@ real-world-infra = []
 dhat-heap = ["cli", "test-fixture"]
 # Enable this feature to enable our colossally weak Fp31.
 weak-field = []
-step-trace = []
+step-trace = ["descriptive-gates"]
+# The following two features are mutually exclusive. Descriptive should be enabled by deafult as the vast majority
+# of unit tests use it. Compact uses memory-efficient gates and is suitable for production.
+descriptive-gates = []
+compact-gates = []
 
 [dependencies]
+ipa-macros = { version = "*", path = "./ipa-macros" }
 aes = "0.8"
 async-trait = "0.1.57"
 axum = { version = "0.5.16", optional = true, features = ["http2"] }
@@ -70,6 +75,7 @@ once_cell = "1.16.0"
 pin-project = "1.0.12"
 rand = "0.8"
 rand_core = "0.6"
+rand_seeder = "0.2.3"
 rcgen = { version = "0.10", optional = true }
 rustls-pemfile = { version = "1", optional = true }
 # TODO(640): sec1 only needed until we standardize on rustls

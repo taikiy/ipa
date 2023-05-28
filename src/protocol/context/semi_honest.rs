@@ -11,8 +11,8 @@ use crate::{
             UpgradableContext, UpgradedContext,
         },
         prss::Endpoint as PrssEndpoint,
-        step::{GateImpl, Step},
-        RecordId,
+        step::{GateImpl, Step, StepNarrow},
+        NoRecord, RecordId,
     },
     secret_sharing::replicated::{
         malicious::ExtendableField, semi_honest::AdditiveShare as Replicated,
@@ -25,6 +25,8 @@ use std::{
     marker::PhantomData,
     num::NonZeroUsize,
 };
+
+use super::{Context as SuperContext, UpgradeContext, UpgradeToMalicious};
 
 #[derive(Clone)]
 pub struct Context<'a> {
@@ -54,7 +56,10 @@ impl<'a> super::Context for Context<'a> {
         self.inner.gate()
     }
 
-    fn narrow<S: Step + ?Sized>(&self, step: &S) -> Self {
+    fn narrow<S: Step + ?Sized>(&self, step: &S) -> Self
+    where
+        GateImpl: StepNarrow<S>,
+    {
         Self {
             inner: self.inner.narrow(step),
         }
@@ -137,7 +142,10 @@ impl<'a, F: ExtendableField> super::Context for Upgraded<'a, F> {
         self.inner.gate()
     }
 
-    fn narrow<S: Step + ?Sized>(&self, step: &S) -> Self {
+    fn narrow<S: Step + ?Sized>(&self, step: &S) -> Self
+    where
+        GateImpl: StepNarrow<S>,
+    {
         Self::new(self.inner.narrow(step))
     }
 
@@ -177,6 +185,18 @@ impl<'a, F: ExtendableField> SeqJoin for Upgraded<'a, F> {
     }
 }
 
+/// This is a dummy step that is used to narrow the semi-honest context
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct UpgradeStep;
+
+impl Step for UpgradeStep {}
+
+impl AsRef<str> for UpgradeStep {
+    fn as_ref(&self) -> &str {
+        "upgrade_semi-honest"
+    }
+}
+
 #[async_trait]
 impl<'a, F: ExtendableField> UpgradedContext<F> for Upgraded<'a, F> {
     type Share = Replicated<F>;
@@ -192,6 +212,26 @@ impl<'a, F: ExtendableField> UpgradedContext<F> for Upgraded<'a, F> {
         _zeros_at: ZeroPositions,
     ) -> Result<Self::Share, Error> {
         Ok(x)
+    }
+
+    async fn upgrade<T, M>(&self, input: T) -> Result<M, Error>
+    where
+        T: Send,
+        UpgradeContext<'a, Self, F>: UpgradeToMalicious<'a, T, M>,
+    {
+        UpgradeContext::new(self.narrow(&UpgradeStep), NoRecord)
+            .upgrade(input)
+            .await
+    }
+
+    async fn upgrade_for<T, M>(&self, record_id: RecordId, input: T) -> Result<M, Error>
+    where
+        T: Send,
+        UpgradeContext<'a, Self, F, RecordId>: UpgradeToMalicious<'a, T, M>,
+    {
+        UpgradeContext::new(self.narrow(&UpgradeStep), record_id)
+            .upgrade(input)
+            .await
     }
 
     #[cfg(test)]

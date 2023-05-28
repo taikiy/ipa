@@ -1,9 +1,15 @@
+mod compact;
 mod descriptive;
 
-pub use descriptive::Descriptive;
 use std::fmt::Debug;
 
-pub type GateImpl = Descriptive;
+pub use compact::Compact;
+pub use descriptive::Descriptive;
+
+#[cfg(feature = "descriptive-gates")]
+pub type GateImpl = descriptive::Descriptive;
+#[cfg(feature = "compact-gates")]
+pub type GateImpl = compact::Compact;
 
 pub trait StepNarrow<S: Step + ?Sized> {
     #[must_use]
