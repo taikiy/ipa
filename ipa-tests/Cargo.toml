@@ -1,0 +1,21 @@
+[package]
+name = "ipa-tests"
+version = "0.1.0"
+rust-version = "1.64.0"
+edition = "2021"
+
+[dependencies]
+ipa-core = { path = "../ipa-core", default-features = false, features = [
+    "cli",
+    "web-app",
+    "real-world-infra",
+    "test-fixture",
+] }
+
+[[test]]
+name = "helper_networks"
+required-features = ["ipa-core/descriptive-gate"]
+
+[[test]]
+name = "compact_gate"
+required-features = ["ipa-core/compact-gate"]

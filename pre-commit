@@ -91,7 +91,7 @@ check "Tests" \
     cargo test
 
 check "Web tests" \
-    cargo test --no-default-features --features "cli web-app real-world-infra test-fixture descriptive-gate"
+    cargo test --no-default-features --features "helper-network-test"
 
 check "Concurrency tests" \
     cargo test --release --features shuttle

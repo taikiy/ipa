@@ -69,7 +69,7 @@ impl<T: ObserveState> Observed<T> {
 mod gateway {
     use delegate::delegate;
 
-    use super::*;
+    use super::{receive, send, AtomicUsize, Debug, Formatter, ObserveState, Observed, Weak};
     use crate::{
         helpers::{
             gateway::{Gateway, State},
@@ -119,6 +119,8 @@ mod gateway {
             #[cfg(not(feature = "shuttle"))]
             {
                 use tracing::Instrument;
+
+                use super::Ordering;
 
                 tokio::spawn({
                     let gateway = r.to_observed();
@@ -215,7 +217,7 @@ mod receive {
         fmt::{Debug, Formatter},
     };
 
-    use super::*;
+    use super::{ObserveState, Observed};
     use crate::{
         helpers::{
             error::Error,
@@ -273,7 +275,7 @@ mod send {
         fmt::{Debug, Formatter},
     };
 
-    use super::*;
+    use super::{ObserveState, Observed};
     use crate::{
         helpers::{
             error::Error,
