@@ -9,7 +9,7 @@ use common::{
 use ipa_core::{cli::CliPaths, helpers::HelperIdentity, test_fixture::ipa::IpaSecurityModel};
 
 #[test]
-#[cfg(all(test, web_test))]
+// #[cfg(all(test, web_test))]
 fn http_network() {
     test_network(false);
 }

@@ -70,7 +70,6 @@ ipa-prf = []
 
 [dependencies]
 ipa-macros = { version = "*", path = "../ipa-macros" }
-
 aes = "0.8.3"
 async-trait = "0.1.68"
 axum = { version = "0.5.17", optional = true, features = ["http2"] }
@@ -164,24 +163,9 @@ path = "src/lib.rs"
 bench = false
 
 [[bin]]
-name = "helper"
-required-features = ["web-app", "real-world-infra"]
-bench = false
-
-[[bin]]
 name = "ipa_bench"
 path = "src/bin/ipa_bench/ipa_bench.rs"
 required-features = ["cli", "enable-serde"]
-bench = false
-
-[[bin]]
-name = "report_collector"
-required-features = ["cli", "test-fixture", "web-app"]
-bench = false
-
-[[bin]]
-name = "test_mpc"
-required-features = ["cli", "test-fixture", "web-app", "weak-field"]
 bench = false
 
 [[bench]]
