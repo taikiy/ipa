@@ -5,29 +5,24 @@ rust-version = "1.64.0"
 edition = "2021"
 
 [features]
+# default = []
 default = [
-    "web-app",
     "in-memory-infra",
-    # by default remove all TRACE, DEBUG spans from release builds
-    "tracing/max_level_trace",
-    "tracing/release_max_level_info",
     "descriptive-gate",
-    "aggregate-circuit",
+    "web-app",
+    "release-trace",
     "stall-detection",
-    "aggregate-circuit",
-    "ipa-prf",
 ]
-cli = ["comfy-table", "clap"]
-enable-serde = ["serde", "serde_json"]
-disable-metrics = []
+# TODO: we may want to use in-memory-bench and real-world-bench some time after
+enable-benches = ["cli", "in-memory-infra", "test-fixture", "criterion", "iai"]
+
 # TODO move web-app to a separate crate. It adds a lot of build time to people who mostly write protocols
 # TODO Consider moving out benches as well
 web-app = [
     "axum",
     "axum-server",
     "base64",
-    "clap",
-    "comfy-table",
+    "cli",
     "enable-serde",
     "hyper",
     "hyper-rustls",
@@ -41,32 +36,38 @@ web-app = [
     "tower-http",
 ]
 test-fixture = ["enable-serde", "weak-field"]
-# Include observability instruments that detect lack of progress inside MPC. If there is a bug that leads to helper
-# miscommunication, this feature helps to detect it. Turning it on has some cost.
-# If "shuttle" feature is enabled, turning this on has no effect.
-stall-detection = []
+
+cli = ["comfy-table", "clap"]
+enable-serde = ["serde", "serde_json"]
 shuttle = ["shuttle-crate", "test-fixture"]
-debug-trace = ["tracing/max_level_trace", "tracing/release_max_level_debug"]
-# TODO: we may want to use in-memory-bench and real-world-bench some time after
-enable-benches = ["cli", "in-memory-infra", "test-fixture", "criterion", "iai"]
+
+### Infrastructure
 # The following two features are mutually exclusive. In-memory should be enabled by default as the vast majority
 # of unit tests use it. Real world infra uses HTTP implementation and is suitable for integration/e2e tests
 in-memory-infra = []
 real-world-infra = []
-dhat-heap = ["cli", "test-fixture"]
-# Enable this feature to enable our colossally weak Fp31.
-weak-field = []
-step-trace = ["descriptive-gate"]
 # The following two features are mutually exclusive. Descriptive should be enabled by deafult as the vast majority
 # of unit tests use it. Compact uses memory-efficient gates and is suitable for production.
 descriptive-gate = []
 compact-gate = ["ipa-macros/compact-gate"]
 
-# Standalone aggregation protocol. We use IPA infra for communication
-# but it has nothing to do with IPA.
-aggregate-circuit = []
-# IPA protocol based on OPRF
-ipa-prf = []
+### Test, Debug & Trace
+# By default remove all TRACE, DEBUG spans from release builds
+release-trace = ["tracing/max_level_trace", "tracing/release_max_level_info"]
+debug-trace = ["tracing/max_level_trace", "tracing/release_max_level_debug"]
+# Compact gate generation
+step-trace = ["descriptive-gate"]
+# DHAT profiling
+dhat-heap = []
+# Disables metrics collection. Useful when profiling to avoid noise from metrics code.
+disable-metrics = []
+# Include observability instruments that detect lack of progress inside MPC. If there is a bug that leads to helper
+# miscommunication, this feature helps to detect it. Turning it on has some cost.
+# If "shuttle" feature is enabled, turning this on has no effect.
+stall-detection = []
+# Enable this feature to enable our colossally weak Fp31.
+weak-field = []
+
 
 [dependencies]
 ipa-macros = { version = "*", path = "../ipa-macros" }
@@ -176,12 +177,12 @@ bench = false
 
 [[bin]]
 name = "report_collector"
-required-features = ["cli", "test-fixture", "web-app"]
+required-features = ["web-app", "test-fixture"]
 bench = false
 
 [[bin]]
 name = "test_mpc"
-required-features = ["cli", "test-fixture", "web-app", "weak-field"]
+required-features = ["web-app", "test-fixture"]
 bench = false
 
 [[bench]]

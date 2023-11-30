@@ -54,7 +54,7 @@ echo "Generating input data"
 
 cd $IPA_REPO
 
-cargo build --bin report_collector --release --features "cli test-fixture web-app"
+cargo build --bin report_collector --release --features "test-fixture web-app"
 
 for (( n=0; n<${#query_sizes[@]}; n++ )); do
   cargo run --bin report_collector --features="cli test-fixture web-app" -- gen-ipa-inputs -n ${query_sizes[$n]} --output-file $DATA_PATH/ipa-events-${query_sizes[$n]}.txt
